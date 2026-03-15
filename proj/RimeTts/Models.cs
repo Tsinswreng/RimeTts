@@ -9,12 +9,10 @@ public sealed class DtoCommit:ILuaDtoCommit, IDtoCommit{
 
 public sealed class DtoKeyEvent:ILuaDtoKeyEvent, IDtoKeyEvent{
 	public str Type{get;set;} = ELuaDtoType.KeyEvent.ToString();
-	public DateTimeOffset AtUtc{get;set;} = DateTimeOffset.UtcNow;
 }
 
 public sealed class Sentence:ISentence{
 	public str Text{get;set;} = "";
-	public DateTimeOffset AtUtc{get;set;} = DateTimeOffset.UtcNow;
 }
 
 public sealed class ReqTranslate:IReqTranslate{

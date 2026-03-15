@@ -106,7 +106,7 @@ public sealed class FileTypingListener(
 			}
 
 			if(type.Equals(ELuaDtoType.KeyEvent.ToString(), StringComparison.OrdinalIgnoreCase)){
-				KeyEventReceived?.Invoke(new DtoKeyEvent{ AtUtc = DateTimeOffset.UtcNow });
+				KeyEventReceived?.Invoke(new DtoKeyEvent());
 			}
 		}
 		catch(Exception ex){

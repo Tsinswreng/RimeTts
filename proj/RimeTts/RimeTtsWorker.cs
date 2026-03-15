@@ -44,7 +44,7 @@ public sealed class RimeTtsWorker(
 			_buf.Append(Commit.Text);
 			_lastCommitAtUtc = DateTimeOffset.UtcNow;
 			if(IsSentenceBoundary(Commit.Text)){
-				FlushSentenceUnsafe(_lastCommitAtUtc);
+				FlushSentenceUnsafe();
 			}
 		}
 	}
@@ -63,7 +63,7 @@ public sealed class RimeTtsWorker(
 				}
 				var gapMs = (now - _lastCommitAtUtc).TotalMilliseconds;
 				if(gapMs >= SegOpt.NoCommitGapMs){
-					FlushSentenceUnsafe(now);
+					FlushSentenceUnsafe();
 				}
 			}
 		}
@@ -104,7 +104,7 @@ public sealed class RimeTtsWorker(
 		}
 	}
 
-	private void FlushSentenceUnsafe(DateTimeOffset now){
+	private void FlushSentenceUnsafe(){
 		var text = _buf.ToString().Trim();
 		_buf.Clear();
 		if(text.Length == 0){
@@ -112,7 +112,6 @@ public sealed class RimeTtsWorker(
 		}
 		_sentenceQ.Writer.TryWrite(new Sentence{
 			Text = text,
-			AtUtc = now,
 		});
 		Log.LogInformation("sentence queued. text={Sentence}", text);
 	}
