@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+using NAudio.Wave;
 using Python.Runtime;
 
 namespace RimeTts;
@@ -114,39 +115,18 @@ def run(text, lang, mp3_path):
 			throw new PlatformNotSupportedException("windows only");
 		}
 
-		var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-		var th = new Thread(() =>
-		{
-			try{
-				var player = new System.Windows.Media.MediaPlayer();
-				player.MediaEnded += (_, _) =>
-				{
-					player.Close();
-					tcs.TrySetResult();
-					System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvokeShutdown(System.Windows.Threading.DispatcherPriority.Background);
-				};
-				player.MediaFailed += (_, e) =>
-				{
-					player.Close();
-					tcs.TrySetException(new InvalidOperationException(e.ErrorException?.Message ?? "media failed"));
-					System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvokeShutdown(System.Windows.Threading.DispatcherPriority.Background);
-				};
+		return Task.Run(() => {
+			Ct.ThrowIfCancellationRequested();
+			using var stream = File.OpenRead(mp3Path);
+			using WaveStream reader = new Mp3FileReader(stream);
+			using var waveOut = new WaveOutEvent();
+			waveOut.Init(reader);
+			waveOut.Play();
 
-				player.Open(new Uri(mp3Path));
-				player.Play();
-				System.Windows.Threading.Dispatcher.Run();
+			while(waveOut.PlaybackState == PlaybackState.Playing){
+				Ct.ThrowIfCancellationRequested();
+				Thread.Sleep(100);
 			}
-			catch(Exception ex){
-				tcs.TrySetException(ex);
-			}
-		});
-		th.IsBackground = true;
-		th.SetApartmentState(ApartmentState.STA);
-		th.Start();
-
-		if(Ct.CanBeCanceled){
-			Ct.Register(() => tcs.TrySetCanceled(Ct));
-		}
-		return tcs.Task;
+		}, Ct);
 	}
 }

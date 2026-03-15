@@ -12,9 +12,9 @@ Translator:
   # LLM API Key
   ApiKey: "sk-xxxxxxxxxxxxxxxx"
   # API 地址（兼容 OpenAI 协议的接口均可）
-  BaseUrl: "https://api.openai.com/v1/chat/completions"
+  BaseUrl: "https://api.moonshot.cn/v1/chat/completions"
   # 模型名（推荐使用响应速度快的）
-  Model: "gpt-4o-mini"
+  Model: "moonshot-v1-8k"
   # 请求超时秒数
   TimeoutSec: 20
   # 翻译系统提示词
