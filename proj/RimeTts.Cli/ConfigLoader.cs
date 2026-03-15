@@ -24,7 +24,7 @@ public static class ConfigLoader{
 
 		var yaml = File.ReadAllText(path);
 		var deserializer = new DeserializerBuilder()
-			.WithNamingConvention(CamelCaseNamingConvention.Instance)
+			.WithNamingConvention(NullNamingConvention.Instance)
 			.IgnoreUnmatchedProperties()
 			.Build();
 
