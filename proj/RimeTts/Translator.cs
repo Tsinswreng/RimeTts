@@ -3,11 +3,16 @@ using Tsinswreng.CsCore;
 namespace RimeTts;
 
 public interface IRespTranslate{
+	[Doc(@$"原始輸入文本")]
+	public str SourceText{get;set;}
+
+	[Doc(@$"翻譯後英文文本")]
+	public str TranslatedText{get;set;}
 
 }
-
 public interface IReqTranslate{
-
+	[Doc(@$"待翻譯原文，默認中文")]
+	public str SourceText{get;set;}
 }
 
 [Doc(@$"翻譯服務")]

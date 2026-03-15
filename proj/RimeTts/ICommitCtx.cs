@@ -11,13 +11,18 @@ public interface IDtoCommit{
 [Doc(@$"RimeLua Process組件中每觸發一次按鍵事件
 就向C\#側發送一個{nameof(IDtoKeyEvent)}")]
 public interface IDtoKeyEvent{
-
+	[Doc(@$"事件時間（UTC）")]
+	public DateTimeOffset AtUtc{get;set;}
 }
 
 
 [Doc(@$"由多個{nameof(IDtoCommit)}組成的句子")]
 public interface ISentence{
+	[Doc(@$"原始中文句子")]
+	public str Text{get;set;}
 
+	[Doc(@$"句子形成時間（UTC）")]
+	public DateTimeOffset AtUtc{get;set;}
 }
 
 
