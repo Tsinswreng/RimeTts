@@ -11,9 +11,13 @@ public sealed class FileTypingListener(
 	public event Action<IDtoCommit>? CommitReceived;
 	public event Action<IDtoKeyEvent>? KeyEventReceived;
 
+	private static readonly TimeSpan DuplicateWindow = TimeSpan.FromMilliseconds(300);
 	private readonly SemaphoreSlim _readLock = new(1, 1);
+	private readonly Lock _dedupeLock = new();
 	private FileSystemWatcher? _watcher;
 	private volatile bool _started;
+	private str _lastPayload = "";
+	private DateTimeOffset _lastPayloadAtUtc = DateTimeOffset.MinValue;
 
 	public Task StartAsync(CT Ct){
 		if(_started){
@@ -81,8 +85,17 @@ public sealed class FileTypingListener(
 				return;
 			}
 
-			var json = await File.ReadAllTextAsync(Opt.ContentFile);
+			string json;
+			using(var fs = new FileStream(Opt.ContentFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+			using(var sr = new System.IO.StreamReader(fs, System.Text.Encoding.UTF8)){
+				json = await sr.ReadToEndAsync();
+			}
 			if(string.IsNullOrWhiteSpace(json)){
+				return;
+			}
+
+			if(IsDuplicatePayload(json)){
+				Log.LogDebug("duplicate payload ignored");
 				return;
 			}
 
@@ -114,6 +127,20 @@ public sealed class FileTypingListener(
 		}
 		finally{
 			_readLock.Release();
+		}
+	}
+
+	private bool IsDuplicatePayload(str json){
+		var now = DateTimeOffset.UtcNow;
+		lock(_dedupeLock){
+			if(string.Equals(_lastPayload, json, StringComparison.Ordinal)
+				&& now - _lastPayloadAtUtc <= DuplicateWindow){
+				return true;
+			}
+
+			_lastPayload = json;
+			_lastPayloadAtUtc = now;
+			return false;
 		}
 	}
 
