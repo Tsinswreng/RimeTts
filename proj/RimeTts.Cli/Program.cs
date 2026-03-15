@@ -1,10 +1,37 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System.IO;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using RimeTts;
+using RimeTts.Cli;
 
 if(!OperatingSystem.IsWindows()){
 	Console.Error.WriteLine("RimeTts.Cli currently supports Windows only.");
+	return;
+}
+
+AppConfig cfg;
+try{
+	cfg = ConfigLoader.Load();
+}
+catch(FileNotFoundException ex){
+	Console.Error.WriteLine(ex.Message);
+	return;
+}
+
+if(string.IsNullOrWhiteSpace(cfg.FileInteractor.ContentFile)
+	|| string.IsNullOrWhiteSpace(cfg.FileInteractor.SignalFile)){
+	Console.Error.WriteLine("config error: fileInteractor.contentFile / signalFile must be set.");
+	return;
+}
+
+if(string.IsNullOrWhiteSpace(cfg.Translator.ApiKey)){
+	Console.Error.WriteLine("config error: translator.apiKey must be set.");
+	return;
+}
+
+if(string.IsNullOrWhiteSpace(cfg.Tts.PythonDllPath)){
+	Console.Error.WriteLine("config error: tts.pythonDllPath must be set.");
 	return;
 }
 
@@ -15,53 +42,30 @@ builder.Logging.AddSimpleConsole(opt => {
 	opt.TimestampFormat = "HH:mm:ss ";
 });
 
-var signalFile = GetRequiredEnv("RIMETTS_SIGNAL_FILE");
-var contentFile = GetRequiredEnv("RIMETTS_CONTENT_FILE");
-var pythonDll = GetRequiredEnv("RIMETTS_PYTHON_DLL");
-var llmApiKey = GetRequiredEnv("RIMETTS_LLM_API_KEY");
-
 builder.Services.AddRimeTts(
 	SetFileOpt: opt => {
-		opt.SignalFile = signalFile;
-		opt.ContentFile = contentFile;
+		opt.SignalFile = cfg.FileInteractor.SignalFile;
+		opt.ContentFile = cfg.FileInteractor.ContentFile;
 	},
 	SetSegOpt: opt => {
-		opt.NoCommitGapMs = GetEnvI64("RIMETTS_NO_COMMIT_GAP_MS", 5000);
+		opt.NoCommitGapMs = cfg.SentenceSeg.NoCommitGapMs;
 	},
 	SetTranslatorOpt: opt => {
-		opt.ApiKey = llmApiKey;
-		opt.BaseUrl = GetEnvOrDefault("RIMETTS_LLM_BASE_URL", "https://api.openai.com/v1/chat/completions");
-		opt.Model = GetEnvOrDefault("RIMETTS_LLM_MODEL", "gpt-4o-mini");
-		opt.TimeoutSec = (int)GetEnvI64("RIMETTS_LLM_TIMEOUT_SEC", 20);
+		opt.ApiKey = cfg.Translator.ApiKey;
+		opt.BaseUrl = cfg.Translator.BaseUrl;
+		opt.Model = cfg.Translator.Model;
+		opt.TimeoutSec = cfg.Translator.TimeoutSec;
+		opt.SystemPrompt = cfg.Translator.SystemPrompt;
 	},
 	SetTtsOpt: opt => {
-		opt.PythonDllPath = pythonDll;
-		opt.OutputDir = GetEnvOrDefault("RIMETTS_AUDIO_OUTPUT_DIR", Path.Combine(AppContext.BaseDirectory, "tts-output"));
+		opt.PythonDllPath = cfg.Tts.PythonDllPath;
+		opt.OutputDir = string.IsNullOrWhiteSpace(cfg.Tts.OutputDir)
+			? Path.Combine(AppContext.BaseDirectory, "tts-output")
+			: cfg.Tts.OutputDir;
 	}
 );
 
 using var host = builder.Build();
 var log = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Bootstrap");
-log.LogInformation("starting RimeTts worker. translation=LLM zh->en; tts=gTTS; windows-only=true");
+log.LogInformation("starting. signal={SignalFile}; model={Model}", cfg.FileInteractor.SignalFile, cfg.Translator.Model);
 await host.RunAsync();
-
-static str GetRequiredEnv(str key){
-	var value = Environment.GetEnvironmentVariable(key);
-	if(string.IsNullOrWhiteSpace(value)){
-		throw new InvalidOperationException($"missing env: {key}");
-	}
-	return value;
-}
-
-static str GetEnvOrDefault(str key, str defaultValue){
-	var value = Environment.GetEnvironmentVariable(key);
-	return string.IsNullOrWhiteSpace(value) ? defaultValue : value;
-}
-
-static i64 GetEnvI64(str key, i64 defaultValue){
-	var value = Environment.GetEnvironmentVariable(key);
-	if(string.IsNullOrWhiteSpace(value)){
-		return defaultValue;
-	}
-	return i64.TryParse(value, out var n) ? n : defaultValue;
-}

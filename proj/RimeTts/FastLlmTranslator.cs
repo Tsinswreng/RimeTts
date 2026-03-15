@@ -39,7 +39,7 @@ public sealed class FastLlmTranslator(
 			model = Opt.Model,
 			temperature = 0.1,
 			messages = new object[]{
-				new{ role = "system", content = "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text." },
+				new{ role = "system", content = Opt.SystemPrompt },
 				new{ role = "user", content = source },
 			},
 		});
