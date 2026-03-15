@@ -1,0 +1,40 @@
+namespace RimeTts;
+
+file class DirDoc{
+	str Doc =
+$$"""
+#Sum[
+
+]
+#Descr[
+我現在想做一個輸入法上屏文本朗讀工具
+簡單描述過程就是把用戶輸入的稍完整的內容(句子/短語)翻譯成英文
+然後文本轉語音 在電腦上播放出音頻
+
+現在這個工具分爲兩端、一部分是 rime輸入法的 lua插件
+一部分是C#服務。
+C#是作爲一個命令行工具。
+Lua與C#的交互方式 參考
+{{nameof(IBaseLuaDto)}}
+{{nameof(IOptFileInteractor)}}
+
+
+用戶實際打字的時候可能是逐字詞輸入、不會一次性輸入一個句子
+我不想讓他輸出太散 即我不想逐字逐詞翻譯然後朗讀、我想拼成一個稍完整的句子/短語後再翻譯朗讀
+{{nameof(IOptSentenceSeg)}}裏有劃分句子的設置
+
+翻譯服務接口: {{nameof(ITranslator)}}
+文本轉語音服務接口: {{nameof(ITts)}}
+
+文本轉語音參考實現: E:\_code\CsRime\RimeTts\proj\RimeTts.Test\Program.cs
+優先用gTTS、這個效果最好。
+其中
+
+使用.Net 依賴注入框架。
+
+注意 多段語音不能併行播放 必須等前面的語音放完後纔能繼續播放後面的。
+注意搞日誌和緩存。 用微軟官方的日誌庫。
+
+]
+""";
+}
