@@ -11,13 +11,12 @@ public sealed class FileTypingListener(
 	public event Action<IDtoCommit>? CommitReceived;
 	public event Action<IDtoKeyEvent>? KeyEventReceived;
 
-	private static readonly TimeSpan DuplicateWindow = TimeSpan.FromMilliseconds(300);
 	private readonly SemaphoreSlim _readLock = new(1, 1);
 	private readonly Lock _dedupeLock = new();
 	private FileSystemWatcher? _watcher;
 	private volatile bool _started;
 	private str _lastPayload = "";
-	private DateTimeOffset _lastPayloadAtUtc = DateTimeOffset.MinValue;
+	private DateTime _lastSignalWriteUtc = DateTime.MinValue;
 
 	public Task StartAsync(CT Ct){
 		if(_started){
@@ -74,27 +73,29 @@ public sealed class FileTypingListener(
 		if(!_started){
 			return;
 		}
-		_ = Task.Run(ReadAndDispatchAsync);
+
+		DateTime signalWriteUtc;
+		try{
+			signalWriteUtc = File.Exists(Opt.SignalFile)
+				? File.GetLastWriteTimeUtc(Opt.SignalFile)
+				: DateTime.UtcNow;
+		}
+		catch{
+			signalWriteUtc = DateTime.UtcNow;
+		}
+
+		_ = Task.Run(() => ReadAndDispatchAsync(signalWriteUtc));
 	}
 
-	private async Task ReadAndDispatchAsync(){
+	private async Task ReadAndDispatchAsync(DateTime signalWriteUtc){
 		await _readLock.WaitAsync();
 		try{
-			await Task.Delay(25);
-			if(!File.Exists(Opt.ContentFile)){
-				return;
-			}
-
-			string json;
-			using(var fs = new FileStream(Opt.ContentFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-			using(var sr = new System.IO.StreamReader(fs, System.Text.Encoding.UTF8)){
-				json = await sr.ReadToEndAsync();
-			}
+			var json = await ReadStableContentJsonAsync();
 			if(string.IsNullOrWhiteSpace(json)){
 				return;
 			}
 
-			if(IsDuplicatePayload(json)){
+			if(IsDuplicateSignalPayload(signalWriteUtc, json)){
 				Log.LogDebug("duplicate payload ignored");
 				return;
 			}
@@ -130,16 +131,49 @@ public sealed class FileTypingListener(
 		}
 	}
 
-	private bool IsDuplicatePayload(str json){
-		var now = DateTimeOffset.UtcNow;
+	private async Task<string> ReadStableContentJsonAsync(){
+		const int maxTry = 6;
+		for(var i = 0; i < maxTry; i++){
+			if(!File.Exists(Opt.ContentFile)){
+				await Task.Delay(5);
+				continue;
+			}
+
+			try{
+				string json;
+				using(var fs = new FileStream(Opt.ContentFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+				using(var sr = new System.IO.StreamReader(fs, System.Text.Encoding.UTF8)){
+					json = await sr.ReadToEndAsync();
+				}
+
+				if(string.IsNullOrWhiteSpace(json)){
+					await Task.Delay(5);
+					continue;
+				}
+
+				using var _ = JsonDocument.Parse(json);
+				return json;
+			}
+			catch(JsonException){
+				await Task.Delay(5);
+			}
+			catch(IOException){
+				await Task.Delay(5);
+			}
+		}
+
+		return "";
+	}
+
+	private bool IsDuplicateSignalPayload(DateTime signalWriteUtc, str json){
 		lock(_dedupeLock){
 			if(string.Equals(_lastPayload, json, StringComparison.Ordinal)
-				&& now - _lastPayloadAtUtc <= DuplicateWindow){
+				&& signalWriteUtc == _lastSignalWriteUtc){
 				return true;
 			}
 
 			_lastPayload = json;
-			_lastPayloadAtUtc = now;
+			_lastSignalWriteUtc = signalWriteUtc;
 			return false;
 		}
 	}
