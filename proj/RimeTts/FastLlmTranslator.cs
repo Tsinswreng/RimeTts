@@ -61,6 +61,7 @@ public sealed class FastLlmTranslator(
 			_cache[source] = translated;
 		}
 
+		Log.LogInformation("llm response. source={Source}; translated={Translated}", source, translated);
 		Log.LogDebug("translate done. sourceLen={SourceLen}; targetLen={TargetLen}", source.Length, translated.Length);
 		return new RespTranslate{ SourceText = source, TranslatedText = translated };
 	}
