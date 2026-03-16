@@ -47,7 +47,7 @@ public class CyclicArray<T>:ICyclicArray<T>{
 			}
 			if(value < _size){
 				for(var i = value; i < _size; i++){
-					SetHead(default!, i);
+					SetHead(i, default!);
 				}
 			}
 			_size = value;
@@ -64,10 +64,10 @@ public class CyclicArray<T>:ICyclicArray<T>{
 	[Doc(@$"equivalent to {nameof(GetHead)} and {nameof(SetHead)}")]
 	public T this[Int Ofst]{
 		get => GetHead(Ofst);
-		set => SetHead(value, Ofst);
+		set => SetHead(Ofst, value);
 	}
 
-	public bool TryAdd(T Value){
+	public bool TryAddHead(T Value){
 		if(Capaticy <= 0 || Size >= Capaticy){
 			return false;
 		}
@@ -98,7 +98,7 @@ public class CyclicArray<T>:ICyclicArray<T>{
 		return true;
 	}
 
-	public bool TrySetHead(T Value, Int Ofst){
+	public bool TrySetHead(Int Ofst, T Value){
 		if(!TryNormalizeHeadOffset(Ofst, out var index)){
 			return false;
 		}
@@ -107,7 +107,7 @@ public class CyclicArray<T>:ICyclicArray<T>{
 		return true;
 	}
 
-	public bool TrySetTail(T Value, Int Ofst){
+	public bool TrySetTail(Int Ofst, T Value){
 		if(!TryNormalizeTailOffset(Ofst, out var index)){
 			return false;
 		}
@@ -130,20 +130,20 @@ public class CyclicArray<T>:ICyclicArray<T>{
 		return value!;
 	}
 
-	public void SetHead(T Value, Int Ofst){
-		if(!TrySetHead(Value, Ofst)){
+	public void SetHead(Int Ofst, T Value){
+		if(!TrySetHead(Ofst, Value)){
 			throw new ArgumentOutOfRangeException(nameof(Ofst), Ofst, "cannot set head element");
 		}
 	}
 
-	public void SetTail(T Value, Int Ofst){
-		if(!TrySetTail(Value, Ofst)){
+	public void SetTail(Int Ofst, T Value){
+		if(!TrySetTail(Ofst, Value)){
 			throw new ArgumentOutOfRangeException(nameof(Ofst), Ofst, "cannot set tail element");
 		}
 	}
 
 	public void Add(T item){
-		if(!TryAdd(item)){
+		if(!TryAddHead(item)){
 			throw new InvalidOperationException("cyclic array is full");
 		}
 	}
@@ -184,7 +184,7 @@ public class CyclicArray<T>:ICyclicArray<T>{
 			}
 
 			for(var j = i; j < Size - 1; j++){
-				SetHead(GetHead(j + 1), j);
+				SetHead(j, GetHead(j + 1));
 			}
 
 			var tailIndex = NormalizeTailOffset(0);
