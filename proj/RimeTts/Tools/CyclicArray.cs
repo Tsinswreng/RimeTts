@@ -72,9 +72,50 @@ public class CyclicArray<T>:ICyclicArray<T>{
 			return false;
 		}
 
+		if(Size == 0){
+			_data[_headIndex] = Value;
+		}else{
+			_headIndex = Mod(_headIndex - 1, Capaticy);
+			_data[_headIndex] = Value;
+		}
+		_size += 1;
+		return true;
+	}
+
+	public bool TryAddTail(T Value){
+		if(Capaticy <= 0 || Size >= Capaticy){
+			return false;
+		}
+
 		var index = NormalizeInsertTailIndex();
 		_data[index] = Value;
 		_size += 1;
+		return true;
+	}
+
+	public bool AddHeadForce(T Value, out T Removed){
+		if(TryAddHead(Value)){
+			Removed = default!;
+			return false;
+		}
+
+		var removed = GetTail(0);
+		_ = RemoveTailCore();
+		_ = TryAddHead(Value);
+		Removed = removed;
+		return true;
+	}
+
+	public bool AddTailForce(T Value, out T Removed){
+		if(TryAddTail(Value)){
+			Removed = default!;
+			return false;
+		}
+
+		var removed = GetHead(0);
+		_ = RemoveHeadCore();
+		_ = TryAddTail(Value);
+		Removed = removed;
 		return true;
 	}
 
@@ -143,7 +184,7 @@ public class CyclicArray<T>:ICyclicArray<T>{
 	}
 
 	public void Add(T item){
-		if(!TryAddHead(item)){
+		if(!TryAddTail(item)){
 			throw new InvalidOperationException("cyclic array is full");
 		}
 	}
@@ -247,6 +288,38 @@ public class CyclicArray<T>:ICyclicArray<T>{
 			return _headIndex;
 		}
 		return Mod(_headIndex + _size, Capaticy);
+	}
+
+	protected T? RemoveHeadCore(){
+		if(_size <= 0){
+			return default;
+		}
+
+		var oldHeadIndex = _headIndex;
+		var removed = _data[oldHeadIndex];
+		_data[oldHeadIndex] = default;
+		_size -= 1;
+		if(_size == 0){
+			_headIndex = 0;
+		}else{
+			_headIndex = Mod(oldHeadIndex + 1, Capaticy);
+		}
+		return removed;
+	}
+
+	protected T? RemoveTailCore(){
+		if(_size <= 0){
+			return default;
+		}
+
+		var tailIndex = NormalizeTailOffset(0);
+		var removed = _data[tailIndex];
+		_data[tailIndex] = default;
+		_size -= 1;
+		if(_size == 0){
+			_headIndex = 0;
+		}
+		return removed;
 	}
 
 	protected void EnsureCapacityAvailable(){

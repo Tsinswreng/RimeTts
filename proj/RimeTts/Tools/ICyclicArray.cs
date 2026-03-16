@@ -29,19 +29,27 @@ public interface ICyclicArray<T>
 		set=>this.SetHead<T>(Ofst, value);
 	}
 
-	[Doc(@$"嘗試於尾部追加元素。
+	[Doc(@$"嘗試於頭部追加元素。
 成功返true；若容量不足等原因失敗返false。
 ")]
 	public bool TryAddHead(T Value);
 
+	[Doc(@$"嘗試於尾部追加元素。
+成功返true；若容量不足等原因失敗返false。
+")]
 	public bool TryAddTail(T Value);
 
 	[Doc(@$"Force Add To Head
 	If full, remove the tail element.
+	#Rtn[if removed, return true; else return false]
 	")]
-	public T AddHeadForce(T Value);
+	public bool AddHeadForce(T Value, out T Removed);
 
-	public T AddTailForce(T Value);
+	[Doc(@$"Force Add To Tail
+	If full, remove the head element.
+	#Rtn[if removed, return true; else return false]
+	")]
+	public bool AddTailForce(T Value, out T Removed);
 
 
 	[Doc(@$"嘗試按頭偏移取值。
@@ -101,7 +109,7 @@ public static class ExtnCyclicArray{
 
 		[Doc(@$"非Try方法。失敗會拋{nameof(InvalidOperationException)}")]
 		public void AddOrThrow(T Value){
-			if(!z.TryAddHead(Value)){
+			if(!z.TryAddTail(Value)){
 				throw new InvalidOperationException("cyclic array is full");
 			}
 		}
