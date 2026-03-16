@@ -12,6 +12,8 @@ public sealed class RimeTtsWorker(
 	ITts Tts,
 	ILogger<RimeTtsWorker> Log
 ):BackgroundService{
+	private static readonly Lock ConsoleLock = new();
+
 	private readonly Lock _bufLock = new();
 	private readonly StringBuilder _buf = new();
 	private DateTimeOffset _lastCommitAtUtc = DateTimeOffset.MinValue;
@@ -40,7 +42,7 @@ public sealed class RimeTtsWorker(
 			return;
 		}
 
-		Log.LogInformation("commit received. text={CommitText}", Commit.Text);
+		WriteColorLine("[上屏詞]", Commit.Text, ConsoleColor.Cyan);
 
 		lock(_bufLock){
 			_buf.Append(Commit.Text);
@@ -115,7 +117,20 @@ public sealed class RimeTtsWorker(
 		_sentenceQ.Writer.TryWrite(new Sentence{
 			Text = text,
 		});
-		Log.LogInformation("sentence queued. text={Sentence}", text);
+		WriteColorLine("[成句]", text, ConsoleColor.Yellow);
+	}
+
+	private static void WriteColorLine(str tag, str text, ConsoleColor color){
+		lock(ConsoleLock){
+			var old = Console.ForegroundColor;
+			try{
+				Console.ForegroundColor = color;
+				Console.WriteLine($"{DateTime.Now:HH:mm:ss} {tag} {text}");
+			}
+			finally{
+				Console.ForegroundColor = old;
+			}
+		}
 	}
 
 	private static bool IsSentenceBoundary(str text){

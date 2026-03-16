@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
 using RimeTts;
 using RimeTts.Cli;
 
@@ -35,6 +36,7 @@ builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(opt => {
 	opt.SingleLine = true;
 	opt.TimestampFormat = "HH:mm:ss ";
+	opt.ColorBehavior = LoggerColorBehavior.Enabled;
 });
 
 builder.Services.AddRimeTts(
