@@ -40,6 +40,8 @@ public sealed class RimeTtsWorker(
 			return;
 		}
 
+		Log.LogInformation("commit received. text={CommitText}", Commit.Text);
+
 		lock(_bufLock){
 			_buf.Append(Commit.Text);
 			_lastCommitAtUtc = DateTimeOffset.UtcNow;
