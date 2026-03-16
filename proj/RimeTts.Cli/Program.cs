@@ -56,6 +56,8 @@ builder.Services.AddRimeTts(
 		opt.OutputDir = string.IsNullOrWhiteSpace(cfg.Tts.OutputDir)
 			? Path.Combine(AppContext.BaseDirectory, "tts-output")
 			: cfg.Tts.OutputDir;
+		opt.Engines = cfg.Tts.Engines?.Where(x => !string.IsNullOrWhiteSpace(x)).ToList()
+			?? new List<str>{ "gTTS", "SystemSpeech" };
 	}
 );
 

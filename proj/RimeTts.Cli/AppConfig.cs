@@ -28,4 +28,5 @@ public sealed class TranslatorSection{
 
 public sealed class TtsSection{
 	public str OutputDir{get;set;} = "";
+	public List<str> Engines{get;set;} = new(){ "gTTS", "SystemSpeech" };
 }

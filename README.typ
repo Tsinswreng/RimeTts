@@ -50,6 +50,9 @@
         SystemPrompt: "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text."
 
       Tts:
+    # TTS 引擎優先級，越靠前越先嘗試
+    # 默認先 gTTS；若失敗則回退 SystemSpeech
+    Engines: ["gTTS", "SystemSpeech"]
         # 生成的音频文件输出目录（留空则使用 EXE 目录下 tts-output）
         OutputDir: ""
       ```
@@ -69,6 +72,7 @@
         [`Translator.Model`], [`gpt-4o-mini`], [模型名],
         [`Translator.TimeoutSec`], [`20`], [翻譯請求超時秒數],
         [`Translator.SystemPrompt`], [見模板], [翻譯系統提示詞],
+        [`Tts.Engines`], [`["gTTS","SystemSpeech"]`], [TTS 引擎優先級列表，前者優先；失敗時按順序回退],
         [`Tts.OutputDir`], [EXE 目錄下 `tts-output`], [合成音頻的緩存目錄],
       )
 

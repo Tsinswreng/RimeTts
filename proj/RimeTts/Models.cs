@@ -54,4 +54,5 @@ public sealed class OptTranslator{
 
 public sealed class OptTts{
 	public str OutputDir{get;set;} = Path.Combine(AppContext.BaseDirectory, "tts-output");
+	public List<str> Engines{get;set;} = new(){ "gTTS", "SystemSpeech" };
 }

@@ -59,8 +59,9 @@ Translator:
 	SystemPrompt: "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text."
 
 Tts:
-	# gTTS HTTP 生成的音频输出目录（留空则使用 EXE 目录下 tts-output）
-  # 生成的音频文件输出目录（留空则使用 EXE 目录下 tts-output）
+	# TTS 引擎优先级，越靠前优先级越高。默认先 gTTS 再 SystemSpeech
+	Engines: ["gTTS", "SystemSpeech"]
+	# 生成的音频文件输出目录（留空则使用 EXE 目录下 tts-output）
 	OutputDir: ""
 """;
 	}
