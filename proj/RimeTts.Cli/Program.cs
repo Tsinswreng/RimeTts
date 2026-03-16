@@ -30,11 +30,6 @@ if(string.IsNullOrWhiteSpace(cfg.Translator.ApiKey)){
 	return;
 }
 
-if(string.IsNullOrWhiteSpace(cfg.Tts.PythonDllPath)){
-	Console.Error.WriteLine("config error: tts.pythonDllPath must be set.");
-	return;
-}
-
 var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(opt => {
@@ -58,7 +53,6 @@ builder.Services.AddRimeTts(
 		opt.SystemPrompt = cfg.Translator.SystemPrompt;
 	},
 	SetTtsOpt: opt => {
-		opt.PythonDllPath = cfg.Tts.PythonDllPath;
 		opt.OutputDir = string.IsNullOrWhiteSpace(cfg.Tts.OutputDir)
 			? Path.Combine(AppContext.BaseDirectory, "tts-output")
 			: cfg.Tts.OutputDir;

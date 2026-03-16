@@ -10,14 +10,8 @@
   #H[前置要求][
 
     - Windows（目前僅支持 Windows）
-    - Python 3.12（需要安裝 `gtts` 包）
-    - Python 可執行文件與 DLL 路徑已知（如 `d:\ENV\python312\python312.dll`）
+  - 能連通 Google TTS HTTP 服務（網路可用）
     - LLM API Key（兼容 OpenAI 協議的接口均可，推薦使用響應速度快的模型如 `gpt-4o-mini`）
-
-    安裝 gTTS：
-    ```
-    python -m pip install gtts
-    ```
 
   ]
 
@@ -56,8 +50,6 @@
         SystemPrompt: "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text."
 
       Tts:
-        # Python DLL 路径
-        PythonDllPath: "d:\\ENV\\python312\\python312.dll"
         # 生成的音频文件输出目录（留空则使用 EXE 目录下 tts-output）
         OutputDir: ""
       ```
@@ -77,7 +69,6 @@
         [`Translator.Model`], [`gpt-4o-mini`], [模型名],
         [`Translator.TimeoutSec`], [`20`], [翻譯請求超時秒數],
         [`Translator.SystemPrompt`], [見模板], [翻譯系統提示詞],
-        [`Tts.PythonDllPath`], [無，必填], [Python DLL 路徑，如 `python312.dll`],
         [`Tts.OutputDir`], [EXE 目錄下 `tts-output`], [合成音頻的緩存目錄],
       )
 
@@ -118,4 +109,12 @@
     ```
 
   ]
+]
+
+
+
+#H[TODO][
+	改日誌輸出細度、每次收到上屏詞時都應該在日誌中顯示
+	處理回車/空格等、使AI見之
+	上下文、保持數個歷史句、㕥增譯ʹ精度
 ]

@@ -27,8 +27,9 @@ public static class ServiceCollectionExt{
 
 		Services.AddSingleton<ITypingListener, FileTypingListener>();
 		Services.AddSingleton<ITranslator, FastLlmTranslator>();
-		Services.AddSingleton<ITts, GttsViaPythonNetTts>();
+		Services.AddSingleton<ITts, GttsViaHttpTts>();
 		Services.AddHttpClient<FastLlmTranslator>();
+		Services.AddHttpClient<GttsViaHttpTts>();
 		Services.AddHostedService<RimeTtsWorker>();
 
 		return Services;

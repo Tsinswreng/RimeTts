@@ -53,6 +53,5 @@ public sealed class OptTranslator{
 }
 
 public sealed class OptTts{
-	public str PythonDllPath{get;set;} = "";
 	public str OutputDir{get;set;} = Path.Combine(AppContext.BaseDirectory, "tts-output");
 }

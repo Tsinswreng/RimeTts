@@ -27,6 +27,5 @@ public sealed class TranslatorSection{
 }
 
 public sealed class TtsSection{
-	public str PythonDllPath{get;set;} = "";
 	public str OutputDir{get;set;} = "";
 }

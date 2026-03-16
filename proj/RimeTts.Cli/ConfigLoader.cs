@@ -36,33 +36,32 @@ public static class ConfigLoader{
 # RimeTts 配置文件
 # 配置文件必须与 EXE 在同一目录下
 
-fileInteractor:
+FileInteractor:
   # Lua 侧写入内容的 JSON 文件路径
-  contentFile: "C:\\tmp\\rimetts_content.json"
+	ContentFile: "C:\\tmp\\rimetts_content.json"
   # Lua 侧触发信号的文件路径（C# 监听此文件变化）
-  signalFile: "C:\\tmp\\rimetts_signal"
+	SignalFile: "C:\\tmp\\rimetts_signal"
 
-sentenceSeg:
+SentenceSeg:
   # 最后一次上屏后多少毫秒认为一个句子结束
-  noCommitGapMs: 5000
+	NoCommitGapMs: 5000
 
-translator:
+Translator:
   # LLM API Key
-  apiKey: ""
+	ApiKey: ""
   # API 地址（兼容 OpenAI 协议的接口均可）
-  baseUrl: "https://api.openai.com/v1/chat/completions"
+	BaseUrl: "https://api.openai.com/v1/chat/completions"
   # 模型名（推荐使用响应速度快的，如 gpt-4o-mini）
-  model: "gpt-4o-mini"
+	Model: "gpt-4o-mini"
   # 请求超时秒数
-  timeoutSec: 20
+	TimeoutSec: 20
   # 翻译系统提示词
-  systemPrompt: "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text."
+	SystemPrompt: "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text."
 
-tts:
-  # Python DLL 路径，例如 d:\ENV\python312\python312.dll
-  pythonDllPath: ""
+Tts:
+	# gTTS HTTP 生成的音频输出目录（留空则使用 EXE 目录下 tts-output）
   # 生成的音频文件输出目录（留空则使用 EXE 目录下 tts-output）
-  outputDir: ""
+	OutputDir: ""
 """;
 	}
 }
