@@ -10,8 +10,6 @@ public sealed class FastLlmTranslator(
 	OptTranslator Opt,
 	ILogger<FastLlmTranslator> Log
 ):ITranslator{
-	private static readonly Lock ConsoleLock = new();
-
 	private readonly Dictionary<str, str> _cache = new();
 	private readonly Lock _lock = new();
 
@@ -27,6 +25,7 @@ public sealed class FastLlmTranslator(
 
 		lock(_lock){
 			if(_cache.TryGetValue(source, out var cached)){
+				ConsoleColorOut.WriteLine("[AI翻譯][Cache]", cached, ConsoleColor.Green);
 				return new RespTranslate{ SourceText = source, TranslatedText = cached };
 			}
 		}
@@ -63,22 +62,9 @@ public sealed class FastLlmTranslator(
 			_cache[source] = translated;
 		}
 
-		Log.LogInformation("llm translated. len={Len}", translated.Length);
-		WriteColorLine("[AI翻譯]", translated, ConsoleColor.Green);
+		Log.LogDebug("llm translated. sourceLen={SourceLen}; translatedLen={TranslatedLen}", source.Length, translated.Length);
+		ConsoleColorOut.WriteLine("[AI翻譯]", translated, ConsoleColor.Green);
 		return new RespTranslate{ SourceText = source, TranslatedText = translated };
-	}
-
-	private static void WriteColorLine(str tag, str text, ConsoleColor color){
-		lock(ConsoleLock){
-			var old = Console.ForegroundColor;
-			try{
-				Console.ForegroundColor = color;
-				Console.WriteLine($"{DateTime.Now:HH:mm:ss} {tag} {text}");
-			}
-			finally{
-				Console.ForegroundColor = old;
-			}
-		}
 	}
 
 	private static str ExtractContent(str Json){

@@ -36,7 +36,7 @@ builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(opt => {
 	opt.SingleLine = true;
 	opt.TimestampFormat = "HH:mm:ss ";
-	opt.ColorBehavior = LoggerColorBehavior.Enabled;
+	opt.ColorBehavior = LoggerColorBehavior.Disabled;
 });
 
 builder.Services.AddRimeTts(
