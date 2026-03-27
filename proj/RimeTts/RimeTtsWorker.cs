@@ -181,11 +181,23 @@ public sealed class RimeTtsWorker(
 		ConsoleColorOut.WriteLine("[成句]", text, ConsoleColor.Yellow);
 	}
 
-	private static bool IsSentenceBoundary(str text){
+	private bool IsSentenceBoundary(str text){
 		if(text.Length == 0){
 			return false;
 		}
-		var c = text[^1];
-		return c is '.' or '!' or '?' or ';' or '。' or '！' or '？' or '；';
+
+		// 如果配置了终止符，使用配置的终止符
+		if(SegOpt.SentenceTerminators != null && SegOpt.SentenceTerminators.Count > 0){
+			var c = text[^1];
+			foreach(var terminator in SegOpt.SentenceTerminators){
+				if(terminator.Length == 1 && c == terminator[0]){
+					return true;
+				}
+			}
+			return false;
+		}
+
+		// 没配置终止符就不使用终止符，只依靠时间间隔
+		return false;
 	}
 }

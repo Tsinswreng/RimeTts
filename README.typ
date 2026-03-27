@@ -36,6 +36,9 @@
       SentenceSeg:
         # 最后一次上屏后多少毫秒认为一个句子结束，默认 5000
         NoCommitGapMs: 5000
+        # 成句终止符列表，当上屏词的最后一个字符是这些字符之一时，立即成句
+        # 如果为空或不配置，则只根据时间间隔成句
+        SentenceTerminators: [".", "!", "?", ";", "。", "！", "？", "；"]
 
       Translator:
         # LLM API Key
@@ -77,6 +80,7 @@
         [`FileInteractor.ContentFile`], [無，必填], [Lua 側寫入上屏內容的 JSON 文件路徑],
         [`FileInteractor.SignalFile`], [無，必填], [Lua 側觸發信號的文件路徑，C\# 監聽此文件變化],
         [`SentenceSeg.NoCommitGapMs`], [`5000`], [最後一次上屏後多少毫秒認為句子結束],
+        [`SentenceSeg.SentenceTerminators`], [空列表], [成句終止符列表，當上屏詞的最後一個字符是這些字符之一時，立即成句；如果為空，則只根據時間間隔成句],
         [`Translator.ApiKey`], [無，必填], [LLM API Key],
         [`Translator.BaseUrl`], [OpenAI 官方地址], [API 地址，兼容 OpenAI 協議均可],
         [`Translator.Model`], [`gpt-4o-mini`], [模型名],
@@ -107,10 +111,9 @@
   #H[工作流程][
 
     + Rime Lua 插件上屏時向 `ContentFile` 寫入 JSON（格式見下），並更新 `SignalFile`。
-    + C\# 側讀取上屏文本，按 `NoCommitGapMs` 間隔聚合成句子。
-    + 句子完成後，按 `LanguagePipeline.Languages` 順序逐個翻譯（帶緩存，按「語種 + 提示詞 + 原文」命中）。
-    + 每個語言按該語言的 `TtsEngines` 優先級合成與播放；未配置時回退全局 `Tts.Engines`。
-    + 串行播放，前一段播完才播下一段。
+    + C\# 側讀取上屏文本，按 `NoCommitGapMs` 間隔聚合成句子（如果配置了 `SentenceTerminators`，則遇到終止符時立即成句）。
+    + 句子完成後，按 `LanguagePipeline.Languages` 順序並行翻譯與生成音頻（帶緩存，按「語種 + 提示詞 + 原文」命中）。
+    + 所有語言的音頻生成完成後，按語言配置順序依次播放。
 
   ]
 

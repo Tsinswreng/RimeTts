@@ -46,6 +46,7 @@ public sealed class OptFileInteractor:IOptFileInteractor{
 
 public sealed class OptSentenceSeg:IOptSentenceSeg{
 	public i64 NoCommitGapMs{get;set;} = 5000;
+	public List<str> SentenceTerminators{get;set;} = new();
 }
 
 public sealed class OptTranslator{

@@ -11,4 +11,10 @@ public interface IOptSentenceSeg{
 	默認5秒
 	")]
 	public i64 NoCommitGapMs{get;set;}
+
+	[Doc(@$"成句終止符列表
+	當上屏詞的最後一個字符是這些字符之一時，立即成句
+	如果為空，則只根據時間間隔成句
+	")]
+	public List<str> SentenceTerminators{get;set;}
 }
