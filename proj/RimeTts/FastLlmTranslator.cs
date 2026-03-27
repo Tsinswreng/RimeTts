@@ -19,14 +19,22 @@ public sealed class FastLlmTranslator(
 		}
 
 		var source = Req.SourceText?.Trim() ?? "";
+		var targetLang = NormalizeTargetLang(Req.TargetLanguage);
+		var systemPrompt = (Req.SystemPrompt?.Trim() ?? "") is { Length: > 0 } reqPrompt
+			? reqPrompt
+			: (string.IsNullOrWhiteSpace(Opt.DefaultSystemPrompt)
+				? "You are a fast translator. Translate source text to target language only. Return only translation text."
+				: Opt.DefaultSystemPrompt);
 		if(source.Length == 0){
-			return new RespTranslate{ SourceText = "", TranslatedText = "" };
+			return new RespTranslate{ SourceText = "", TargetLanguage = targetLang, TranslatedText = "" };
 		}
 
+		var cacheKey = $"{targetLang}\n{systemPrompt}\n{source}";
+
 		lock(_lock){
-			if(_cache.TryGetValue(source, out var cached)){
+			if(_cache.TryGetValue(cacheKey, out var cached)){
 				ConsoleColorOut.WriteLine("[AI翻譯][Cache]", cached, ConsoleColor.Green);
-				return new RespTranslate{ SourceText = source, TranslatedText = cached };
+				return new RespTranslate{ SourceText = source, TargetLanguage = targetLang, TranslatedText = cached };
 			}
 		}
 
@@ -40,7 +48,7 @@ public sealed class FastLlmTranslator(
 			model = Opt.Model,
 			temperature = 0.1,
 			messages = new object[]{
-				new{ role = "system", content = Opt.SystemPrompt },
+				new{ role = "system", content = systemPrompt },
 				new{ role = "user", content = source },
 			},
 		});
@@ -59,12 +67,23 @@ public sealed class FastLlmTranslator(
 		}
 
 		lock(_lock){
-			_cache[source] = translated;
+			_cache[cacheKey] = translated;
 		}
 
-		Log.LogDebug("llm translated. sourceLen={SourceLen}; translatedLen={TranslatedLen}", source.Length, translated.Length);
+		Log.LogDebug("llm translated. target={Target}; sourceLen={SourceLen}; translatedLen={TranslatedLen}", targetLang, source.Length, translated.Length);
 		ConsoleColorOut.WriteLine("[AI翻譯]", translated, ConsoleColor.Green);
-		return new RespTranslate{ SourceText = source, TranslatedText = translated };
+		return new RespTranslate{ SourceText = source, TargetLanguage = targetLang, TranslatedText = translated };
+	}
+
+	private static str NormalizeTargetLang(str? targetLang){
+		if(string.IsNullOrWhiteSpace(targetLang)){
+			return "en";
+		}
+		var norm = targetLang.Trim().ToLowerInvariant();
+		return norm switch{
+			"jp" => "ja",
+			_ => norm,
+		};
 	}
 
 	private static str ExtractContent(str Json){

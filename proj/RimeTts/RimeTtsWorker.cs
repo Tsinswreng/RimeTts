@@ -8,6 +8,7 @@ namespace RimeTts;
 public sealed class RimeTtsWorker(
 	ITypingListener TypingListener,
 	IOptSentenceSeg SegOpt,
+	IOptLanguagePipeline LangPipelineOpt,
 	ITranslator Translator,
 	ITts Tts,
 	ILogger<RimeTtsWorker> Log
@@ -86,17 +87,25 @@ public sealed class RimeTtsWorker(
 		}
 
 		try{
-			var tr = await Translator.Translate(new ReqTranslate{ SourceText = source }, Ct);
-			var target = tr.TranslatedText.Trim();
-			if(target.Length == 0){
-				Log.LogWarning("translation empty. source={Source}", source);
+			var languageProfiles = LangPipelineOpt.Languages
+				.Where(x => x is not null)
+				.Select(x => new{
+					Lang = NormalizeLang(x.Language),
+					Prompt = x.SystemPrompt?.Trim() ?? "",
+					TtsEngines = x.TtsEngines?.Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => e.Trim()).ToList() ?? new List<str>(),
+				})
+				.Where(x => x.Lang.Length > 0)
+				.ToList();
+
+			if(languageProfiles.Count == 0){
+				Log.LogWarning("no language profiles configured, fallback to en");
+				await TranslateEtSpeak(source, "en", "", null, Ct);
 				return;
 			}
 
-			_ = await Tts.GenEtPlay(new ReqGenEtPlay{
-				Text = target,
-				Language = "en",
-			}, Ct);
+			foreach(var p in languageProfiles){
+				await TranslateEtSpeak(source, p.Lang, p.Prompt, p.TtsEngines, Ct);
+			}
 		}
 		catch(OperationCanceledException){
 			throw;
@@ -104,6 +113,44 @@ public sealed class RimeTtsWorker(
 		catch(Exception ex){
 			Log.LogError(ex, "process sentence failed. text={Sentence}", source);
 		}
+	}
+
+	private async Task TranslateEtSpeak(str source, str lang, str prompt, List<str>? preferredEngines, CT Ct){
+		try{
+			var tr = await Translator.Translate(new ReqTranslate{
+				SourceText = source,
+				TargetLanguage = lang,
+				SystemPrompt = prompt,
+			}, Ct);
+			var target = tr.TranslatedText.Trim();
+			if(target.Length == 0){
+				Log.LogWarning("translation empty. source={Source}; lang={Lang}", source, lang);
+				return;
+			}
+
+			_ = await Tts.GenEtPlay(new ReqGenEtPlay{
+				Text = target,
+				Language = lang,
+				PreferredEngines = preferredEngines,
+			}, Ct);
+		}
+		catch(OperationCanceledException){
+			throw;
+		}
+		catch(Exception ex){
+			Log.LogWarning(ex, "translate/speak failed. source={Source}; lang={Lang}", source, lang);
+		}
+	}
+
+	private static str NormalizeLang(str? lang){
+		if(string.IsNullOrWhiteSpace(lang)){
+			return "";
+		}
+		var norm = lang.Trim().ToLowerInvariant();
+		return norm switch{
+			"jp" => "ja",
+			_ => norm,
+		};
 	}
 
 	private void FlushSentenceUnsafe(){

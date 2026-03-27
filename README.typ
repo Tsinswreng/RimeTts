@@ -5,7 +5,7 @@
 #H[RimeTts 使用說明][
 
   RimeTts 是一個輸入法上屏文本朗讀工具。
-  Rime 輸入法的 Lua 插件將上屏文字通過文件傳給 C\# 服務，C\# 服務將中文句子用 LLM 翻譯成英文，再用 gTTS 合成語音並播放。
+  Rime 輸入法的 Lua 插件將上屏文字通過文件傳給 C\# 服務，C\# 服務會按配置中的語言順序逐個翻譯並朗讀。
 
   #H[前置要求][
 
@@ -46,15 +46,25 @@
         Model: "gpt-4o-mini"
         # 请求超时秒数
         TimeoutSec: 20
-        # 翻译系统提示词
-        SystemPrompt: "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text."
+        # 默认翻译系统提示词（某语言未配置 SystemPrompt 时使用）
+        DefaultSystemPrompt: "You are a fast translator. Translate source text to target language only. Return only translation text."
 
       Tts:
-    # TTS 引擎優先級，越靠前越先嘗試
-    # 默認先 gTTS；若失敗則回退 SystemSpeech
-    Engines: ["gTTS", "SystemSpeech"]
+        # 全局默认 TTS 引擎优先级（某语言未配置 TtsEngines 时使用）
+        Engines: ["gTTS", "SystemSpeech"]
         # 生成的音频文件输出目录（留空则使用 EXE 目录下 tts-output）
         OutputDir: ""
+
+      LanguagePipeline:
+        # 顺序即播放顺序
+        Languages:
+          - Language: "en"
+            SystemPrompt: "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text."
+            TtsEngines: ["gTTS", "SystemSpeech"]
+          - Language: "ja"
+            # 目標語言是日語時，提示詞可直接用日語
+            SystemPrompt: "あなたは高速な翻訳者です。中国語を自然で簡潔な日本語に翻訳してください。翻訳結果の本文のみを返してください。"
+            TtsEngines: ["gTTS", "SystemSpeech"]
       ```
 
     ]
@@ -71,9 +81,13 @@
         [`Translator.BaseUrl`], [OpenAI 官方地址], [API 地址，兼容 OpenAI 協議均可],
         [`Translator.Model`], [`gpt-4o-mini`], [模型名],
         [`Translator.TimeoutSec`], [`20`], [翻譯請求超時秒數],
-        [`Translator.SystemPrompt`], [見模板], [翻譯系統提示詞],
+        [`Translator.DefaultSystemPrompt`], [見模板], [默認翻譯系統提示詞],
         [`Tts.Engines`], [`["gTTS","SystemSpeech"]`], [TTS 引擎優先級列表，前者優先；失敗時按順序回退],
         [`Tts.OutputDir`], [EXE 目錄下 `tts-output`], [合成音頻的緩存目錄],
+        [`LanguagePipeline.Languages`], [見模板], [語言流水線，順序即翻譯/播放順序],
+        [`LanguagePipeline.Languages[].Language`], [無，必填], [目標語言代碼，如 `en` / `ja`],
+        [`LanguagePipeline.Languages[].SystemPrompt`], [可空], [該語言專用系統提示詞],
+        [`LanguagePipeline.Languages[].TtsEngines`], [可空], [該語言專用 TTS 引擎優先級],
       )
 
     ]
@@ -94,8 +108,8 @@
 
     + Rime Lua 插件上屏時向 `ContentFile` 寫入 JSON（格式見下），並更新 `SignalFile`。
     + C\# 側讀取上屏文本，按 `NoCommitGapMs` 間隔聚合成句子。
-    + 句子完成後調用 LLM 翻譯為英文（帶緩存，相同原文不重複請求）。
-    + 調用 gTTS 合成英文語音 MP3（帶緩存，相同譯文不重複生成）。
+    + 句子完成後，按 `LanguagePipeline.Languages` 順序逐個翻譯（帶緩存，按「語種 + 提示詞 + 原文」命中）。
+    + 每個語言按該語言的 `TtsEngines` 優先級合成與播放；未配置時回退全局 `Tts.Engines`。
     + 串行播放，前一段播完才播下一段。
 
   ]

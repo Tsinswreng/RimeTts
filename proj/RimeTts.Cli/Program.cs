@@ -31,6 +31,11 @@ if(string.IsNullOrWhiteSpace(cfg.Translator.ApiKey)){
 	return;
 }
 
+if(cfg.LanguagePipeline.Languages is not { Count: > 0 }){
+	Console.Error.WriteLine("config error: languagePipeline.languages must contain at least one language profile.");
+	return;
+}
+
 var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(opt => {
@@ -52,7 +57,9 @@ builder.Services.AddRimeTts(
 		opt.BaseUrl = cfg.Translator.BaseUrl;
 		opt.Model = cfg.Translator.Model;
 		opt.TimeoutSec = cfg.Translator.TimeoutSec;
-		opt.SystemPrompt = cfg.Translator.SystemPrompt;
+		opt.DefaultSystemPrompt = string.IsNullOrWhiteSpace(cfg.Translator.DefaultSystemPrompt)
+			? opt.DefaultSystemPrompt
+			: cfg.Translator.DefaultSystemPrompt;
 	},
 	SetTtsOpt: opt => {
 		opt.OutputDir = string.IsNullOrWhiteSpace(cfg.Tts.OutputDir)
@@ -60,6 +67,28 @@ builder.Services.AddRimeTts(
 			: cfg.Tts.OutputDir;
 		opt.Engines = cfg.Tts.Engines?.Where(x => !string.IsNullOrWhiteSpace(x)).ToList()
 			?? new List<str>{ "gTTS", "SystemSpeech" };
+	},
+	SetLanguagePipelineOpt: opt => {
+		opt.Languages = cfg.LanguagePipeline.Languages
+			.Where(x => x is not null)
+			.Select(x => (ILanguageProfile)new LanguageProfile{
+				Language = (x.Language ?? "").Trim(),
+				SystemPrompt = x.SystemPrompt ?? "",
+				TtsEngines = x.TtsEngines?.Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => e.Trim()).ToList()
+					?? new List<str>(),
+			})
+			.Where(x => !string.IsNullOrWhiteSpace(x.Language))
+			.ToList();
+
+		if(opt.Languages.Count == 0){
+			opt.Languages = new List<ILanguageProfile>{
+				new LanguageProfile{
+					Language = "en",
+					SystemPrompt = "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text.",
+					TtsEngines = new(){ "gTTS", "SystemSpeech" },
+				}
+			};
+		}
 	}
 );
 

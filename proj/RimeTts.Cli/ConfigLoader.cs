@@ -55,14 +55,24 @@ Translator:
 	Model: "gpt-4o-mini"
   # 请求超时秒数
 	TimeoutSec: 20
-  # 翻译系统提示词
-	SystemPrompt: "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text."
+  # 默认翻译系统提示词（当语言条目未显式设置时使用）
+	DefaultSystemPrompt: "You are a fast translator. Translate source text to target language only. Return only translation text."
 
 Tts:
 	# TTS 引擎优先级，越靠前优先级越高。默认先 gTTS 再 SystemSpeech
 	Engines: ["gTTS", "SystemSpeech"]
 	# 生成的音频文件输出目录（留空则使用 EXE 目录下 tts-output）
 	OutputDir: ""
+
+LanguagePipeline:
+	# 語言順序即播放順序，按列表從上到下依次翻譯並朗讀
+	Languages:
+		- Language: "en"
+			SystemPrompt: "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text."
+			TtsEngines: ["gTTS", "SystemSpeech"]
+		- Language: "ja"
+			SystemPrompt: "あなたは高速な翻訳者です。中国語を自然で簡潔な日本語に翻訳してください。翻訳結果の本文のみを返してください。"
+			TtsEngines: ["gTTS", "SystemSpeech"]
 """;
 	}
 }

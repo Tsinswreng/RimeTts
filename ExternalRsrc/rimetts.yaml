@@ -2,9 +2,9 @@
 # 配置文件必须与 EXE 在同一目录下
 FileInteractor:
   # Lua 侧写入内容的 JSON 文件路径
-  ContentFile: "C:/tmp/rimetts_content.json"
+  ContentFile: "D:/Program Files/Rime/User_Data/rimetts_content.json"
   # Lua 侧触发信号的文件路径（C# 监听此文件变化）
-  SignalFile: "C:/tmp/rimetts_signal"
+  SignalFile: "D:/Program Files/Rime/User_Data/rimetts_signal"
 SentenceSeg:
   # 最后一次上屏后多少毫秒认为一个句子结束，默认 5000
   NoCommitGapMs: 5000
@@ -17,10 +17,19 @@ Translator:
   Model: "moonshot-v1-8k"
   # 请求超时秒数
   TimeoutSec: 20
-  # 翻译系统提示词
-  SystemPrompt: "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text."
+  # 默认翻译系统提示词（某语言未配置 SystemPrompt 时使用）
+  DefaultSystemPrompt: "You are a fast translator. Translate source text to target language only. Return only translation text."
 Tts:
-  # TTS 引擎优先级，越靠前越先尝试。默认先 gTTS，失败后回退 SystemSpeech
+  # 全局默认 TTS 引擎优先级（某语言未配置 TtsEngines 时使用）
   Engines: ["gTTS", "SystemSpeech"]
   # 生成的音频文件输出目录（留空则使用 EXE 目录下 tts-output）
   OutputDir: ""
+LanguagePipeline:
+  # 语种顺序即翻译和播放顺序
+  Languages:
+    - Language: "en"
+      SystemPrompt: "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text."
+      TtsEngines: ["gTTS", "SystemSpeech"]
+    - Language: "ja"
+      SystemPrompt: "あなたは高速な翻訳者です。中国語を自然で簡潔な日本語に翻訳してください。翻訳結果の本文のみを返してください。"
+      TtsEngines: ["gTTS", "SystemSpeech"]

@@ -11,6 +11,7 @@ public interface IPlayState{
 public interface IReqGenEtPlay{
 	public str Text{get;set;}
 	public str Language{get;set;}
+	public List<str>? PreferredEngines{get;set;}
 }
 
 

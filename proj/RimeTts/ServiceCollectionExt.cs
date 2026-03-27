@@ -4,7 +4,7 @@ using Microsoft.Extensions.Hosting;
 namespace RimeTts;
 
 public static class ServiceCollectionExt{
-	public static IServiceCollection AddRimeTts(this IServiceCollection Services, Action<OptFileInteractor> SetFileOpt, Action<OptSentenceSeg>? SetSegOpt = null, Action<OptTranslator>? SetTranslatorOpt = null, Action<OptTts>? SetTtsOpt = null){
+	public static IServiceCollection AddRimeTts(this IServiceCollection Services, Action<OptFileInteractor> SetFileOpt, Action<OptSentenceSeg>? SetSegOpt = null, Action<OptTranslator>? SetTranslatorOpt = null, Action<OptTts>? SetTtsOpt = null, Action<OptLanguagePipeline>? SetLanguagePipelineOpt = null){
 		var fileOpt = new OptFileInteractor();
 		SetFileOpt(fileOpt);
 		if(string.IsNullOrWhiteSpace(fileOpt.ContentFile) || string.IsNullOrWhiteSpace(fileOpt.SignalFile)){
@@ -20,8 +20,12 @@ public static class ServiceCollectionExt{
 		var ttsOpt = new OptTts();
 		SetTtsOpt?.Invoke(ttsOpt);
 
+		var langPipelineOpt = new OptLanguagePipeline();
+		SetLanguagePipelineOpt?.Invoke(langPipelineOpt);
+
 		Services.AddSingleton<IOptFileInteractor>(fileOpt);
 		Services.AddSingleton<IOptSentenceSeg>(segOpt);
+		Services.AddSingleton<IOptLanguagePipeline>(langPipelineOpt);
 		Services.AddSingleton(trOpt);
 		Services.AddSingleton(ttsOpt);
 

@@ -6,6 +6,9 @@ public interface IRespTranslate{
 	[Doc(@$"原始輸入文本")]
 	public str SourceText{get;set;}
 
+	[Doc(@$"目標語言代碼，如 en / ja")]
+	public str TargetLanguage{get;set;}
+
 	[Doc(@$"翻譯後英文文本")]
 	public str TranslatedText{get;set;}
 
@@ -13,6 +16,12 @@ public interface IRespTranslate{
 public interface IReqTranslate{
 	[Doc(@$"待翻譯原文，默認中文")]
 	public str SourceText{get;set;}
+
+	[Doc(@$"目標語言代碼，如 en / ja")]
+	public str TargetLanguage{get;set;}
+
+	[Doc(@$"本次翻譯使用的系統提示詞；空則使用默認提示詞")]
+	public str SystemPrompt{get;set;}
 }
 
 [Doc(@$"翻譯服務")]

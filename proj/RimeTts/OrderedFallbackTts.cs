@@ -9,7 +9,11 @@ public sealed class OrderedFallbackTts(
 	ILogger<OrderedFallbackTts> Log
 ):ITts{
 	public async Task<IPlayState> GenEtPlay(IReqGenEtPlay Req, CT Ct){
-		var engines = (Opt.Engines is { Count: > 0 } ? Opt.Engines : new List<str>{ "gTTS", "SystemSpeech" })
+		var sourceEngines = Req.PreferredEngines is { Count: > 0 }
+			? Req.PreferredEngines
+			: (Opt.Engines is { Count: > 0 } ? Opt.Engines : new List<str>{ "gTTS", "SystemSpeech" });
+
+		var engines = sourceEngines
 			.Where(x => !string.IsNullOrWhiteSpace(x))
 			.Select(x => x.Trim())
 			.Distinct(StringComparer.OrdinalIgnoreCase)
