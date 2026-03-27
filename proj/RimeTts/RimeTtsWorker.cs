@@ -99,12 +99,25 @@ public sealed class RimeTtsWorker(
 
 			if(languageProfiles.Count == 0){
 				Log.LogWarning("no language profiles configured, fallback to en");
-				await TranslateEtSpeak(source, "en", "", null, Ct);
+				var audioFile = await TranslateAndGenerateAudio(source, "en", "", null, Ct);
+				if(audioFile != null){
+					await Tts.PlayAudio(audioFile, Ct);
+				}
 				return;
 			}
 
-			foreach(var p in languageProfiles){
-				await TranslateEtSpeak(source, p.Lang, p.Prompt, p.TtsEngines, Ct);
+			// 并行获取所有语言的翻译和音频
+			var audioTasks = languageProfiles.Select(p =>
+				TranslateAndGenerateAudio(source, p.Lang, p.Prompt, p.TtsEngines, Ct)
+			).ToList();
+
+			var audioFiles = await Task.WhenAll(audioTasks);
+
+			// 按顺序播放音频
+			foreach(var audioFile in audioFiles){
+				if(audioFile != null){
+					await Tts.PlayAudio(audioFile, Ct);
+				}
 			}
 		}
 		catch(OperationCanceledException){
@@ -115,7 +128,7 @@ public sealed class RimeTtsWorker(
 		}
 	}
 
-	private async Task TranslateEtSpeak(str source, str lang, str prompt, List<str>? preferredEngines, CT Ct){
+	private async Task<str?> TranslateAndGenerateAudio(str source, str lang, str prompt, List<str>? preferredEngines, CT Ct){
 		try{
 			var tr = await Translator.Translate(new ReqTranslate{
 				SourceText = source,
@@ -125,20 +138,23 @@ public sealed class RimeTtsWorker(
 			var target = tr.TranslatedText.Trim();
 			if(target.Length == 0){
 				Log.LogWarning("translation empty. source={Source}; lang={Lang}", source, lang);
-				return;
+				return null;
 			}
 
-			_ = await Tts.GenEtPlay(new ReqGenEtPlay{
+			var audioFile = await Tts.GenerateAudio(new ReqGenEtPlay{
 				Text = target,
 				Language = lang,
 				PreferredEngines = preferredEngines,
 			}, Ct);
+			Log.LogDebug("audio generated. lang={Lang}; file={File}", lang, audioFile);
+			return audioFile;
 		}
 		catch(OperationCanceledException){
 			throw;
 		}
 		catch(Exception ex){
-			Log.LogWarning(ex, "translate/speak failed. source={Source}; lang={Lang}", source, lang);
+			Log.LogWarning(ex, "translate/generate audio failed. source={Source}; lang={Lang}", source, lang);
+			return null;
 		}
 	}
 

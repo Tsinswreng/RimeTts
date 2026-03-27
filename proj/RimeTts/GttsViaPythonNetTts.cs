@@ -118,4 +118,44 @@ public sealed class GttsViaHttpTts(
 			}
 		}, Ct);
 	}
+
+	public async Task<str> GenerateAudio(IReqGenEtPlay Req, CT Ct){
+		if(!OperatingSystem.IsWindows()){
+			throw new PlatformNotSupportedException("gTTS playback is implemented for Windows only");
+		}
+
+		var text = Req.Text?.Trim() ?? "";
+		if(text.Length == 0){
+			throw new ArgumentException("tts text is empty", nameof(Req));
+		}
+
+		Directory.CreateDirectory(Opt.OutputDir);
+
+		var filePath = Path.Combine(Opt.OutputDir, $"gtts_{HashHex(text)}.mp3");
+		if(!File.Exists(filePath)){
+			var lang = Req.Language?.Trim() is { Length: > 0 } langVal ? langVal : "en";
+			await GenerateWithGttsHttp(text, lang, filePath, Ct);
+		}
+		Log.LogDebug("gtts audio generated. file={File}", filePath);
+		return filePath;
+	}
+
+	public async Task PlayAudio(str AudioFile, CT Ct){
+		if(!OperatingSystem.IsWindows()){
+			throw new PlatformNotSupportedException("windows only");
+		}
+
+		if(!File.Exists(AudioFile)){
+			throw new FileNotFoundException("audio file not found", AudioFile);
+		}
+
+		await _playLock.WaitAsync(Ct);
+		try{
+			await PlayMp3WindowsAsync(AudioFile, Ct);
+		}
+		finally{
+			_playLock.Release();
+		}
+		Log.LogInformation("audio played. file={AudioFile}", AudioFile);
+	}
 }

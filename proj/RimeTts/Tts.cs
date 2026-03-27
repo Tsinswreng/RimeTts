@@ -22,4 +22,14 @@ public interface ITts{
 	public Task<IPlayState> GenEtPlay(
 		IReqGenEtPlay Req, CT Ct
 	);
+
+	[Doc(@$"只生成語音文件，返回文件路徑")]
+	public Task<str> GenerateAudio(
+		IReqGenEtPlay Req, CT Ct
+	);
+
+	[Doc(@$"播放指定的音頻文件")]
+	public Task PlayAudio(
+		str AudioFile, CT Ct
+	);
 }

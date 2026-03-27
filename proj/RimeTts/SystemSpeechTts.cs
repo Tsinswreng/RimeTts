@@ -76,4 +76,42 @@ public sealed class SystemSpeechTts(
 			}
 		}, Ct);
 	}
+
+	public Task<str> GenerateAudio(IReqGenEtPlay Req, CT Ct){
+		if(!OperatingSystem.IsWindows()){
+			throw new PlatformNotSupportedException("System.Speech is implemented for Windows only");
+		}
+
+		var text = Req.Text?.Trim() ?? "";
+		if(text.Length == 0){
+			throw new ArgumentException("tts text is empty", nameof(Req));
+		}
+
+		Directory.CreateDirectory(Opt.OutputDir);
+		var wavPath = Path.Combine(Opt.OutputDir, $"system_speech_{HashHex(text)}.wav");
+		if(!File.Exists(wavPath)){
+			GenerateWav(text, wavPath);
+		}
+		Log.LogDebug("system speech audio generated. file={File}", wavPath);
+		return Task.FromResult(wavPath);
+	}
+
+	public async Task PlayAudio(str AudioFile, CT Ct){
+		if(!OperatingSystem.IsWindows()){
+			throw new PlatformNotSupportedException("windows only");
+		}
+
+		if(!File.Exists(AudioFile)){
+			throw new FileNotFoundException("audio file not found", AudioFile);
+		}
+
+		await _playLock.WaitAsync(Ct);
+		try{
+			await PlayWavWindowsAsync(AudioFile, Ct);
+		}
+		finally{
+			_playLock.Release();
+		}
+		Log.LogInformation("audio played. file={AudioFile}", AudioFile);
+	}
 }
