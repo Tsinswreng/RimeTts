@@ -39,7 +39,7 @@ public sealed class SystemSpeechTts(
 		}
 		var endAt = DateTimeOffset.UtcNow;
 
-		Log.LogInformation("system speech played. file={AudioFile}; durationMs={Duration}", wavPath, (endAt - startAt).TotalMilliseconds);
+		//Log.LogInformation("system speech played. file={AudioFile}; durationMs={Duration}", wavPath, (endAt - startAt).TotalMilliseconds);
 		return new PlayState{
 			AudioFile = wavPath,
 			StartedAtUtc = startAt,
@@ -112,6 +112,6 @@ public sealed class SystemSpeechTts(
 		finally{
 			_playLock.Release();
 		}
-		Log.LogInformation("audio played. file={AudioFile}", AudioFile);
+		//Log.LogInformation("audio played. file={AudioFile}", AudioFile);
 	}
 }

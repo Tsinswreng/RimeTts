@@ -23,7 +23,7 @@ public sealed class RimeTtsWorker(
 		TypingListener.KeyEventReceived += OnKeyEvent;
 		await TypingListener.StartAsync(StoppingToken);
 
-		Log.LogInformation("worker started");
+		//Log.LogInformation("worker started");
 		try{
 			var timerTask = RunSegmentTimer(StoppingToken);
 			var consumeTask = ConsumeSentenceQ(StoppingToken);
@@ -42,6 +42,7 @@ public sealed class RimeTtsWorker(
 		}
 
 		ConsoleColorOut.WriteLine("[上屏詞]", Commit.Text, ConsoleColor.Cyan);
+		//Log.LogInformation("[上屏詞] {Text}", Commit.Text);
 
 		lock(_bufLock){
 			_buf.Append(Commit.Text);
@@ -179,6 +180,7 @@ public sealed class RimeTtsWorker(
 			Text = text,
 		});
 		ConsoleColorOut.WriteLine("[成句]", text, ConsoleColor.Yellow);
+		//Log.LogInformation("[成句] {Text}", text);
 	}
 
 	private bool IsSentenceBoundary(str text){

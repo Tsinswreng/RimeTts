@@ -38,6 +38,7 @@ if(cfg.LanguagePipeline.Languages is not { Count: > 0 }){
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.ClearProviders();
+builder.Logging.AddFilter("System.Net.Http.HttpClient", LogLevel.Warning);  // 加这一行
 builder.Logging.AddSimpleConsole(opt => {
 	opt.SingleLine = true;
 	opt.TimestampFormat = "HH:mm:ss ";
@@ -95,4 +96,5 @@ builder.Services.AddRimeTts(
 using var host = builder.Build();
 var log = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Bootstrap");
 log.LogInformation("starting. signal={SignalFile}; model={Model}", cfg.FileInteractor.SignalFile, cfg.Translator.Model);
+
 await host.RunAsync();

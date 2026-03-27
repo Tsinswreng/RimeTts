@@ -69,8 +69,6 @@ public sealed class FastLlmTranslator(
 		lock(_lock){
 			_cache[cacheKey] = translated;
 		}
-
-		Log.LogDebug("llm translated. target={Target}; sourceLen={SourceLen}; translatedLen={TranslatedLen}", targetLang, source.Length, translated.Length);
 		ConsoleColorOut.WriteLine("[AI翻譯]", translated, ConsoleColor.Green);
 		return new RespTranslate{ SourceText = source, TargetLanguage = targetLang, TranslatedText = translated };
 	}

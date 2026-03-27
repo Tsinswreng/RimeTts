@@ -25,17 +25,17 @@ public sealed class OrderedFallbackTts(
 			Ct.ThrowIfCancellationRequested();
 			try{
 				if(engine.Equals("gTTS", StringComparison.OrdinalIgnoreCase)){
-					Log.LogInformation("tts try engine={Engine}", engine);
+					//Log.LogInformation("tts try engine={Engine}", engine);
 					return await Gtts.GenEtPlay(Req, Ct);
 				}
 
 				if(engine.Equals("SystemSpeech", StringComparison.OrdinalIgnoreCase)
 					|| engine.Equals("System.Speech", StringComparison.OrdinalIgnoreCase)){
-					Log.LogInformation("tts try engine={Engine}", engine);
+					//Log.LogInformation("tts try engine={Engine}", engine);
 					return await SystemSpeech.GenEtPlay(Req, Ct);
 				}
 
-				Log.LogWarning("unknown tts engine ignored: {Engine}", engine);
+				//Log.LogWarning("unknown tts engine ignored: {Engine}", engine);
 			}
 			catch(OperationCanceledException){
 				throw;
@@ -65,13 +65,13 @@ public sealed class OrderedFallbackTts(
 			Ct.ThrowIfCancellationRequested();
 			try{
 				if(engine.Equals("gTTS", StringComparison.OrdinalIgnoreCase)){
-					Log.LogInformation("tts generate try engine={Engine}", engine);
+					//Log.LogInformation("tts generate try engine={Engine}", engine);
 					return await Gtts.GenerateAudio(Req, Ct);
 				}
 
 				if(engine.Equals("SystemSpeech", StringComparison.OrdinalIgnoreCase)
 					|| engine.Equals("System.Speech", StringComparison.OrdinalIgnoreCase)){
-					Log.LogInformation("tts generate try engine={Engine}", engine);
+					//Log.LogInformation("tts generate try engine={Engine}", engine);
 					return await SystemSpeech.GenerateAudio(Req, Ct);
 				}
 
