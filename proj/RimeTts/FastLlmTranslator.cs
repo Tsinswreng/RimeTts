@@ -46,7 +46,6 @@ public sealed class FastLlmTranslator(
 		reqMsg.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Opt.ApiKey);
 		var payload = JsonSerializer.Serialize(new{
 			model = Opt.Model,
-			temperature = 0.1,
 			messages = new object[]{
 				new{ role = "system", content = systemPrompt },
 				new{ role = "user", content = source },
@@ -58,7 +57,14 @@ public sealed class FastLlmTranslator(
 		cts.CancelAfter(TimeSpan.FromSeconds(Math.Max(3, Opt.TimeoutSec)));
 
 		using var resp = await Http.SendAsync(reqMsg, cts.Token);
-		resp.EnsureSuccessStatusCode();
+		if (!resp.IsSuccessStatusCode){
+			var errorContent = await resp.Content.ReadAsStringAsync();
+			// 输出到日志或控制台
+			Console.WriteLine($"HTTP {resp.StatusCode}: {errorContent}");
+			// 也可以抛出包含详细信息的异常
+			throw new HttpRequestException($"Response status code does not indicate success: {(int)resp.StatusCode} ({resp.ReasonPhrase}). Details: {errorContent}");
+		}
+		resp.EnsureSuccessStatusCode(); // 如果上面已处理，可注释掉
 
 		var json = await resp.Content.ReadAsStringAsync(cts.Token);
 		var translated = ExtractContent(json).Trim();
