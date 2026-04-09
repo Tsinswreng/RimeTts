@@ -17,14 +17,11 @@ public sealed class FastLlmTranslator(
 		if(Req is null){
 			throw new ArgumentNullException(nameof(Req));
 		}
+		var systemPrompt = Req.SystemPrompt;
+		var source = Req.SourceText+"\n"+systemPrompt;
 
-		var source = Req.SourceText?.Trim() ?? "";
 		var targetLang = NormalizeTargetLang(Req.TargetLanguage);
-		var systemPrompt = (Req.SystemPrompt?.Trim() ?? "") is { Length: > 0 } reqPrompt
-			? reqPrompt
-			: (string.IsNullOrWhiteSpace(Opt.DefaultSystemPrompt)
-				? "You are a fast translator. Translate source text to target language only. Return only translation text."
-				: Opt.DefaultSystemPrompt);
+
 		if(source.Length == 0){
 			return new RespTranslate{ SourceText = "", TargetLanguage = targetLang, TranslatedText = "" };
 		}
