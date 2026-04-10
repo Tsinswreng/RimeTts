@@ -28,8 +28,13 @@ LanguagePipeline:
   # 语种顺序即翻译和播放顺序
   Languages:
     - Language: "en"
-      SystemPrompt: "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text."
       TtsEngines: ["gTTS", "SystemSpeech"]
+      SystemPrompt: |
+        You are a fast translator. Translate user's input to English . Return only translation text.
+        the folloing is user's input:
+      #
     - Language: "ja"
-      SystemPrompt: "あなたは高速な翻訳者です。中国語を自然で簡潔な日本語に翻訳してください。翻訳結果の本文のみを返してください。"
       TtsEngines: ["gTTS", "SystemSpeech"]
+      SystemPrompt: |
+        あなたは翻訳者です。ユーザーの入力を日本語に翻訳してください。翻訳結果の本文のみを返してください。
+        以下のユーザーの入力です:

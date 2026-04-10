@@ -18,7 +18,7 @@ public sealed class FastLlmTranslator(
 			throw new ArgumentNullException(nameof(Req));
 		}
 		var systemPrompt = Req.SystemPrompt;
-		var source = Req.SourceText+"\n"+systemPrompt;
+		var source = Req.SourceText;
 
 		var targetLang = NormalizeTargetLang(Req.TargetLanguage);
 
