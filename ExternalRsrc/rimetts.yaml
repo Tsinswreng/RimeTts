@@ -30,11 +30,18 @@ LanguagePipeline:
     - Language: "en"
       TtsEngines: ["gTTS", "SystemSpeech"]
       SystemPrompt: |
-        You are a fast translator. Translate user's input to English . Return only translation text.
+        You are a fast translator. Translate user's input to English. 
+        if you don't recognize user's input, justt keep silent and do not output any text.
+        Return only translation text. DO NOT output any other text.
         the folloing is user's input:
       #
     - Language: "ja"
       TtsEngines: ["gTTS", "SystemSpeech"]
       SystemPrompt: |
-        あなたは翻訳者です。ユーザーの入力を日本語に翻訳してください。翻訳結果の本文のみを返してください。
-        以下のユーザーの入力です:
+        You are a fast translator. Translate user's input to Japanese. 
+        if you don't recognize user's input, justt keep silent and do not output any text.
+        Return only translation text. DO NOT output any other text.
+        the folloing is user's input:
+      # SystemPrompt: |
+      #   あなたは翻訳者です。ユーザーの入力を日本語に翻訳してください。翻訳結果の本文のみを返してください。
+      #   以下のユーザーの入力です:
