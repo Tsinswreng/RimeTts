@@ -2,6 +2,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Speech.Synthesis;
 using System.Text;
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using NAudio.Wave;
 
@@ -19,14 +20,15 @@ public sealed class SystemSpeechTts(
 		}
 
 		var text = Req.Text?.Trim() ?? "";
+		var lang = Req.Language?.Trim() ?? "";
 		if(text.Length == 0){
 			throw new ArgumentException("tts text is empty", nameof(Req));
 		}
 
 		Directory.CreateDirectory(Opt.OutputDir);
-		var wavPath = Path.Combine(Opt.OutputDir, $"system_speech_{HashHex(text)}.wav");
+		var wavPath = Path.Combine(Opt.OutputDir, $"system_speech_{HashHex($"{lang}\n{text}")}.wav");
 		if(!File.Exists(wavPath)){
-			GenerateWav(text, wavPath);
+			GenerateWav(text, lang, wavPath);
 		}
 
 		await _playLock.WaitAsync(Ct);
@@ -52,13 +54,71 @@ public sealed class SystemSpeechTts(
 		return Convert.ToHexString(bytes).ToLowerInvariant();
 	}
 
-	private static void GenerateWav(str text, str wavPath){
+	private static void GenerateWav(str text, str language, str wavPath){
 		using var synth = new SpeechSynthesizer();
+		SelectVoiceByLanguageOrThrow(synth, language);
 		synth.Rate = 0;
 		synth.Volume = 100;
 		synth.SetOutputToWaveFile(wavPath);
 		synth.Speak(text);
 		synth.SetOutputToNull();
+	}
+
+	private static void SelectVoiceByLanguageOrThrow(SpeechSynthesizer synth, str language){
+		if(string.IsNullOrWhiteSpace(language)){
+			return;
+		}
+
+		var culture = ResolveCulture(language);
+		if(culture is null){
+			return;
+		}
+
+		try{
+			synth.SelectVoiceByHints(VoiceGender.NotSet, VoiceAge.NotSet, 0, culture);
+			return;
+		}
+		catch{
+			// fallback to manual scan below
+		}
+
+		foreach(var voice in synth.GetInstalledVoices()){
+			var vc = voice.VoiceInfo.Culture;
+			if(string.Equals(vc.Name, culture.Name, StringComparison.OrdinalIgnoreCase)
+				|| string.Equals(vc.TwoLetterISOLanguageName, culture.TwoLetterISOLanguageName, StringComparison.OrdinalIgnoreCase)){
+				synth.SelectVoice(voice.VoiceInfo.Name);
+				return;
+			}
+		}
+
+		throw new InvalidOperationException($"No installed System.Speech voice for language '{language}' ({culture.Name}).");
+	}
+
+	private static CultureInfo? ResolveCulture(str language){
+		var lang = language.Trim();
+		if(lang.Length == 0){
+			return null;
+		}
+
+		try{
+			if(string.Equals(lang, "ja", StringComparison.OrdinalIgnoreCase)){
+				return CultureInfo.GetCultureInfo("ja-JP");
+			}
+			if(string.Equals(lang, "jp", StringComparison.OrdinalIgnoreCase)){
+				return CultureInfo.GetCultureInfo("ja-JP");
+			}
+			if(string.Equals(lang, "en", StringComparison.OrdinalIgnoreCase)){
+				return CultureInfo.GetCultureInfo("en-US");
+			}
+			if(string.Equals(lang, "zh", StringComparison.OrdinalIgnoreCase)){
+				return CultureInfo.GetCultureInfo("zh-CN");
+			}
+
+			return CultureInfo.GetCultureInfo(lang);
+		}
+		catch(CultureNotFoundException){
+			return null;
+		}
 	}
 
 	private static Task PlayWavWindowsAsync(str wavPath, CT Ct){
@@ -83,14 +143,15 @@ public sealed class SystemSpeechTts(
 		}
 
 		var text = Req.Text?.Trim() ?? "";
+		var lang = Req.Language?.Trim() ?? "";
 		if(text.Length == 0){
 			throw new ArgumentException("tts text is empty", nameof(Req));
 		}
 
 		Directory.CreateDirectory(Opt.OutputDir);
-		var wavPath = Path.Combine(Opt.OutputDir, $"system_speech_{HashHex(text)}.wav");
+		var wavPath = Path.Combine(Opt.OutputDir, $"system_speech_{HashHex($"{lang}\n{text}")}.wav");
 		if(!File.Exists(wavPath)){
-			GenerateWav(text, wavPath);
+			GenerateWav(text, lang, wavPath);
 		}
 		Log.LogDebug("system speech audio generated. file={File}", wavPath);
 		return Task.FromResult(wavPath);

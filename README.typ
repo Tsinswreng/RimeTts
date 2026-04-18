@@ -10,6 +10,7 @@
   #H[前置要求][
 
     - Windows（目前僅支持 Windows）
+	- 若使用 `SystemSpeech` 朗讀日語，需在 Windows 安裝日語語音（`ja-JP`）
   - 能連通 Google TTS HTTP 服務（網路可用）
     - LLM API Key（兼容 OpenAI 協議的接口均可，推薦使用響應速度快的模型如 `gpt-4o-mini`）
 
