@@ -80,7 +80,8 @@ public sealed class FileTypingListener(
 				? File.GetLastWriteTimeUtc(Opt.SignalFile)
 				: DateTime.UtcNow;
 		}
-		catch{
+		catch(Exception ex){
+			Log.LogWarning(ex, "failed to get signal file write time. signal={SignalFile}", Opt.SignalFile);
 			signalWriteUtc = DateTime.UtcNow;
 		}
 
@@ -92,6 +93,7 @@ public sealed class FileTypingListener(
 		try{
 			var json = await ReadStableContentJsonAsync();
 			if(string.IsNullOrWhiteSpace(json)){
+				Log.LogWarning("content json empty after retries. content={ContentFile}; signal={SignalFile}", Opt.ContentFile, Opt.SignalFile);
 				return;
 			}
 
@@ -162,6 +164,7 @@ public sealed class FileTypingListener(
 			}
 		}
 
+		Log.LogWarning("content json still unavailable or invalid after retries. content={ContentFile}", Opt.ContentFile);
 		return "";
 	}
 

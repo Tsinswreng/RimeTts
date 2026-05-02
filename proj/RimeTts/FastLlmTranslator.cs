@@ -30,7 +30,7 @@ public sealed class FastLlmTranslator(
 
 		lock(_lock){
 			if(_cache.TryGetValue(cacheKey, out var cached)){
-				ConsoleColorOut.WriteLine("[AI翻譯][Cache]", cached, ConsoleColor.Green);
+				Log.LogTranslationCacheText(cached);
 				return new RespTranslate{ SourceText = source, TargetLanguage = targetLang, TranslatedText = cached };
 			}
 		}
@@ -56,12 +56,10 @@ public sealed class FastLlmTranslator(
 		using var resp = await Http.SendAsync(reqMsg, cts.Token);
 		if (!resp.IsSuccessStatusCode){
 			var errorContent = await resp.Content.ReadAsStringAsync();
-			// 输出到日志或控制台
-			Console.WriteLine($"HTTP {resp.StatusCode}: {errorContent}");
-			// 也可以抛出包含详细信息的异常
+			Log.LogError("translator http failed. statusCode={StatusCode}; reason={ReasonPhrase}; body={Body}; source={Source}; lang={Lang}", (int)resp.StatusCode, resp.ReasonPhrase, errorContent, source, targetLang);
 			throw new HttpRequestException($"Response status code does not indicate success: {(int)resp.StatusCode} ({resp.ReasonPhrase}). Details: {errorContent}");
 		}
-		resp.EnsureSuccessStatusCode(); // 如果上面已处理，可注释掉
+		resp.EnsureSuccessStatusCode();
 
 		var json = await resp.Content.ReadAsStringAsync(cts.Token);
 		var translated = ExtractContent(json).Trim();
@@ -72,7 +70,6 @@ public sealed class FastLlmTranslator(
 		lock(_lock){
 			_cache[cacheKey] = translated;
 		}
-		ConsoleColorOut.WriteLine("[AI翻譯]", translated, ConsoleColor.Green);
 		return new RespTranslate{ SourceText = source, TargetLanguage = targetLang, TranslatedText = translated };
 	}
 

@@ -41,8 +41,7 @@ public sealed class RimeTtsWorker(
 			return;
 		}
 
-		ConsoleColorOut.WriteLine("[上屏詞]", Commit.Text, ConsoleColor.Cyan);
-		//Log.LogInformation("[上屏詞] {Text}", Commit.Text);
+		Log.LogCommitText(Commit.Text);
 
 		lock(_bufLock){
 			_buf.Append(Commit.Text);
@@ -141,6 +140,7 @@ public sealed class RimeTtsWorker(
 				Log.LogWarning("translation empty. source={Source}; lang={Lang}", source, lang);
 				return null;
 			}
+			Log.LogTranslationText(target);
 
 			var audioFile = await Tts.GenerateAudio(new ReqGenEtPlay{
 				Text = target,
@@ -179,8 +179,7 @@ public sealed class RimeTtsWorker(
 		_sentenceQ.Writer.TryWrite(new Sentence{
 			Text = text,
 		});
-		ConsoleColorOut.WriteLine("[成句]", text, ConsoleColor.Yellow);
-		//Log.LogInformation("[成句] {Text}", text);
+		Log.LogSentenceText(text);
 	}
 
 	private bool IsSentenceBoundary(str text){
