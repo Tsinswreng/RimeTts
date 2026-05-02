@@ -13,10 +13,15 @@ public sealed class RimeTtsWorker(
 	ITts Tts,
 	ILogger<RimeTtsWorker> Log
 ):BackgroundService{
+	private static readonly TimeSpan PerTranslationTimeout = TimeSpan.FromSeconds(20);
+	private static readonly TimeSpan PerAudioGenerateTimeout = TimeSpan.FromSeconds(40);
+	private static readonly TimeSpan PerAudioPlayTimeout = TimeSpan.FromSeconds(20);
+	private static readonly SemaphoreSlim SentenceGate = new(2, 2);
 	private readonly Lock _bufLock = new();
 	private readonly StringBuilder _buf = new();
 	private DateTimeOffset _lastCommitAtUtc = DateTimeOffset.MinValue;
 	private readonly Channel<ISentence> _sentenceQ = Channel.CreateUnbounded<ISentence>();
+	private readonly Channel<AudioJob> _audioQ = Channel.CreateUnbounded<AudioJob>();
 
 	protected override async Task ExecuteAsync(CT StoppingToken){
 		TypingListener.CommitReceived += OnCommit;
@@ -27,7 +32,8 @@ public sealed class RimeTtsWorker(
 		try{
 			var timerTask = RunSegmentTimer(StoppingToken);
 			var consumeTask = ConsumeSentenceQ(StoppingToken);
-			await Task.WhenAll(timerTask, consumeTask);
+			var audioTask = ConsumeAudioQ(StoppingToken);
+			await Task.WhenAll(timerTask, consumeTask, audioTask);
 		}
 		finally{
 			TypingListener.CommitReceived -= OnCommit;
@@ -75,8 +81,24 @@ public sealed class RimeTtsWorker(
 	private async Task ConsumeSentenceQ(CT Ct){
 		while(await _sentenceQ.Reader.WaitToReadAsync(Ct)){
 			while(_sentenceQ.Reader.TryRead(out var sentence)){
-				await ProcessSentence(sentence, Ct);
+				_ = Task.Run(() => ProcessSentenceDetached(sentence, Ct), Ct);
 			}
+		}
+	}
+
+	private async Task ProcessSentenceDetached(ISentence sentence, CT Ct){
+		await SentenceGate.WaitAsync(Ct);
+		try{
+			await ProcessSentence(sentence, Ct);
+		}
+		catch(OperationCanceledException){
+			throw;
+		}
+		catch(Exception ex){
+			Log.LogError(ex, "sentence task failed. text={Sentence}", sentence.Text);
+		}
+		finally{
+			SentenceGate.Release();
 		}
 	}
 
@@ -99,24 +121,32 @@ public sealed class RimeTtsWorker(
 
 			if(languageProfiles.Count == 0){
 				Log.LogWarning("no language profiles configured, fallback to en");
-				var audioFile = await TranslateAndGenerateAudio(source, "en", "", null, Ct);
-				if(audioFile != null){
-					await Tts.PlayAudio(audioFile, Ct);
+				var translation = await TranslateWithTimeout(source, "en", "", Ct);
+				if(translation != null){
+					await EnqueueAudioJob(new AudioJob{
+						Source = source,
+						Language = "en",
+						TranslatedText = translation,
+						PreferredEngines = null,
+					}, Ct);
 				}
 				return;
 			}
 
-			// 并行获取所有语言的翻译和音频
-			var audioTasks = languageProfiles.Select(p =>
-				TranslateAndGenerateAudio(source, p.Lang, p.Prompt, p.TtsEngines, Ct)
-			).ToList();
-
-			var audioFiles = await Task.WhenAll(audioTasks);
-
-			// 按顺序播放音频
-			foreach(var audioFile in audioFiles){
-				if(audioFile != null){
-					await Tts.PlayAudio(audioFile, Ct);
+			foreach(var profile in languageProfiles){
+				var translation = await TranslateWithTimeout(
+					source,
+					profile.Lang,
+					profile.Prompt,
+					Ct
+				);
+				if(translation != null){
+					await EnqueueAudioJob(new AudioJob{
+						Source = source,
+						Language = profile.Lang,
+						TranslatedText = translation,
+						PreferredEngines = profile.TtsEngines,
+					}, Ct);
 				}
 			}
 		}
@@ -128,7 +158,19 @@ public sealed class RimeTtsWorker(
 		}
 	}
 
-	private async Task<str?> TranslateAndGenerateAudio(str source, str lang, str prompt, List<str>? preferredEngines, CT Ct){
+	private async Task<str?> TranslateWithTimeout(str source, str lang, str prompt, CT outerCt){
+		using var cts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
+		cts.CancelAfter(PerTranslationTimeout);
+		try{
+			return await TranslateOnly(source, lang, prompt, cts.Token);
+		}
+		catch(OperationCanceledException) when(!outerCt.IsCancellationRequested && cts.IsCancellationRequested){
+			Log.LogWarning("translation timed out. source={Source}; lang={Lang}; timeoutSec={TimeoutSec}", source, lang, PerTranslationTimeout.TotalSeconds);
+			return null;
+		}
+	}
+
+	private async Task<str?> TranslateOnly(str source, str lang, str prompt, CT Ct){
 		try{
 			var tr = await Translator.Translate(new ReqTranslate{
 				SourceText = source,
@@ -141,21 +183,71 @@ public sealed class RimeTtsWorker(
 				return null;
 			}
 			Log.LogTranslationText(target);
-
-			var audioFile = await Tts.GenerateAudio(new ReqGenEtPlay{
-				Text = target,
-				Language = lang,
-				PreferredEngines = preferredEngines,
-			}, Ct);
-			Log.LogDebug("audio generated. lang={Lang}; file={File}", lang, audioFile);
-			return audioFile;
+			return target;
 		}
 		catch(OperationCanceledException){
 			throw;
 		}
 		catch(Exception ex){
-			Log.LogWarning(ex, "translate/generate audio failed. source={Source}; lang={Lang}", source, lang);
+			Log.LogWarning(ex, "translation failed. source={Source}; lang={Lang}", source, lang);
 			return null;
+		}
+	}
+
+	private async Task EnqueueAudioJob(AudioJob job, CT Ct){
+		await _audioQ.Writer.WriteAsync(job, Ct);
+	}
+
+	private async Task ConsumeAudioQ(CT Ct){
+		while(await _audioQ.Reader.WaitToReadAsync(Ct)){
+			while(_audioQ.Reader.TryRead(out var job)){
+				await GenerateAndPlayAudio(job, Ct);
+			}
+		}
+	}
+
+	private async Task GenerateAndPlayAudio(AudioJob job, CT Ct){
+		try{
+			var audioFile = await GenerateAudioWithTimeout(job, Ct);
+			if(audioFile is null){
+				return;
+			}
+			await PlayAudioWithTimeout(audioFile, job.Language, Ct);
+		}
+		catch(OperationCanceledException){
+			throw;
+		}
+		catch(Exception ex){
+			Log.LogWarning(ex, "audio pipeline failed. source={Source}; lang={Lang}", job.Source, job.Language);
+		}
+	}
+
+	private async Task<str?> GenerateAudioWithTimeout(AudioJob job, CT outerCt){
+		using var cts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
+		cts.CancelAfter(PerAudioGenerateTimeout);
+		try{
+			var audioFile = await Tts.GenerateAudio(new ReqGenEtPlay{
+				Text = job.TranslatedText,
+				Language = job.Language,
+				PreferredEngines = job.PreferredEngines,
+			}, cts.Token);
+			Log.LogDebug("audio generated. lang={Lang}; file={File}", job.Language, audioFile);
+			return audioFile;
+		}
+		catch(OperationCanceledException) when(!outerCt.IsCancellationRequested && cts.IsCancellationRequested){
+			Log.LogWarning("audio generate timed out. source={Source}; lang={Lang}; timeoutSec={TimeoutSec}", job.Source, job.Language, PerAudioGenerateTimeout.TotalSeconds);
+			return null;
+		}
+	}
+
+	private async Task PlayAudioWithTimeout(str audioFile, str lang, CT outerCt){
+		using var cts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
+		cts.CancelAfter(PerAudioPlayTimeout);
+		try{
+			await Tts.PlayAudio(audioFile, cts.Token);
+		}
+		catch(OperationCanceledException) when(!outerCt.IsCancellationRequested && cts.IsCancellationRequested){
+			Log.LogWarning("audio play timed out. lang={Lang}; file={AudioFile}; timeoutSec={TimeoutSec}", lang, audioFile, PerAudioPlayTimeout.TotalSeconds);
 		}
 	}
 
@@ -200,5 +292,12 @@ public sealed class RimeTtsWorker(
 
 		// 没配置终止符就不使用终止符，只依靠时间间隔
 		return false;
+	}
+
+	private sealed class AudioJob{
+		public str Source{get;set;} = "";
+		public str Language{get;set;} = "";
+		public str TranslatedText{get;set;} = "";
+		public List<str>? PreferredEngines{get;set;}
 	}
 }

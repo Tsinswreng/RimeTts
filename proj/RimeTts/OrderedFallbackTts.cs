@@ -9,6 +9,9 @@ public sealed class OrderedFallbackTts(
 	SystemSpeechTts SystemSpeech,
 	ILogger<OrderedFallbackTts> Log
 ):ITts{
+	private static readonly TimeSpan GenerateTimeout = TimeSpan.FromSeconds(12);
+	private static readonly TimeSpan PlayTimeout = TimeSpan.FromSeconds(20);
+
 	public async Task<IPlayState> GenEtPlay(IReqGenEtPlay Req, CT Ct){
 		var sourceEngines = Req.PreferredEngines is { Count: > 0 }
 			? Req.PreferredEngines
@@ -25,14 +28,24 @@ public sealed class OrderedFallbackTts(
 			Ct.ThrowIfCancellationRequested();
 			try{
 				if(engine.Equals("gTTS", StringComparison.OrdinalIgnoreCase)){
-					//Log.LogInformation("tts try engine={Engine}", engine);
-					return await Gtts.GenEtPlay(Req, Ct);
+					return await RunWithTimeout(
+						engine,
+						"gen-play",
+						innerCt => Gtts.GenEtPlay(Req, innerCt),
+						PlayTimeout,
+						Ct
+					);
 				}
 
 				if(engine.Equals("SystemSpeech", StringComparison.OrdinalIgnoreCase)
 					|| engine.Equals("System.Speech", StringComparison.OrdinalIgnoreCase)){
-					//Log.LogInformation("tts try engine={Engine}", engine);
-					return await SystemSpeech.GenEtPlay(Req, Ct);
+					return await RunWithTimeout(
+						engine,
+						"gen-play",
+						innerCt => SystemSpeech.GenEtPlay(Req, innerCt),
+						PlayTimeout,
+						Ct
+					);
 				}
 
 				//Log.LogWarning("unknown tts engine ignored: {Engine}", engine);
@@ -65,14 +78,24 @@ public sealed class OrderedFallbackTts(
 			Ct.ThrowIfCancellationRequested();
 			try{
 				if(engine.Equals("gTTS", StringComparison.OrdinalIgnoreCase)){
-					//Log.LogInformation("tts generate try engine={Engine}", engine);
-					return await Gtts.GenerateAudio(Req, Ct);
+					return await RunWithTimeout(
+						engine,
+						"generate",
+						innerCt => Gtts.GenerateAudio(Req, innerCt),
+						GenerateTimeout,
+						Ct
+					);
 				}
 
 				if(engine.Equals("SystemSpeech", StringComparison.OrdinalIgnoreCase)
 					|| engine.Equals("System.Speech", StringComparison.OrdinalIgnoreCase)){
-					//Log.LogInformation("tts generate try engine={Engine}", engine);
-					return await SystemSpeech.GenerateAudio(Req, Ct);
+					return await RunWithTimeout(
+						engine,
+						"generate",
+						innerCt => SystemSpeech.GenerateAudio(Req, innerCt),
+						GenerateTimeout,
+						Ct
+					);
 				}
 
 				Log.LogWarning("unknown tts engine ignored: {Engine}", engine);
@@ -94,12 +117,29 @@ public sealed class OrderedFallbackTts(
 		var ext = Path.GetExtension(AudioFile).ToLowerInvariant();
 		try{
 			if(ext == ".mp3"){
-				await Gtts.PlayAudio(AudioFile, Ct);
+				await RunWithTimeout(
+					"gTTS",
+					"play",
+					innerCt => Gtts.PlayAudio(AudioFile, innerCt),
+					PlayTimeout,
+					Ct
+				);
 			} else if(ext == ".wav"){
-				await SystemSpeech.PlayAudio(AudioFile, Ct);
+				await RunWithTimeout(
+					"SystemSpeech",
+					"play",
+					innerCt => SystemSpeech.PlayAudio(AudioFile, innerCt),
+					PlayTimeout,
+					Ct
+				);
 			} else {
-				// 尝试用gTTS播放
-				await Gtts.PlayAudio(AudioFile, Ct);
+				await RunWithTimeout(
+					"gTTS",
+					"play",
+					innerCt => Gtts.PlayAudio(AudioFile, innerCt),
+					PlayTimeout,
+					Ct
+				);
 			}
 		}
 		catch(OperationCanceledException){
@@ -107,7 +147,35 @@ public sealed class OrderedFallbackTts(
 		}
 		catch(Exception ex){
 			Log.LogWarning(ex, "play audio failed with gTTS, try system speech. file={AudioFile}", AudioFile);
-			await SystemSpeech.PlayAudio(AudioFile, Ct);
+			await RunWithTimeout(
+				"SystemSpeech",
+				"play-fallback",
+				innerCt => SystemSpeech.PlayAudio(AudioFile, innerCt),
+				PlayTimeout,
+				Ct
+			);
+		}
+	}
+
+	private async Task<T> RunWithTimeout<T>(str engine, str stage, Func<CT, Task<T>> action, TimeSpan timeout, CT outerCt){
+		using var cts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
+		cts.CancelAfter(timeout);
+		try{
+			return await action(cts.Token);
+		}
+		catch(OperationCanceledException ex) when(!outerCt.IsCancellationRequested && cts.IsCancellationRequested){
+			throw new TimeoutException($"tts {stage} timed out after {timeout.TotalSeconds:0}s. engine={engine}", ex);
+		}
+	}
+
+	private async Task RunWithTimeout(str engine, str stage, Func<CT, Task> action, TimeSpan timeout, CT outerCt){
+		using var cts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
+		cts.CancelAfter(timeout);
+		try{
+			await action(cts.Token);
+		}
+		catch(OperationCanceledException ex) when(!outerCt.IsCancellationRequested && cts.IsCancellationRequested){
+			throw new TimeoutException($"tts {stage} timed out after {timeout.TotalSeconds:0}s. engine={engine}", ex);
 		}
 	}
 }

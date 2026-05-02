@@ -34,7 +34,6 @@ public static class ServiceCollectionExt{
 		Services.AddSingleton<GttsViaHttpTts>();
 		Services.AddSingleton<SystemSpeechTts>();
 		Services.AddSingleton<ITts, OrderedFallbackTts>();
-		Services.AddHttpClient<FastLlmTranslator>();
 		Services.AddHttpClient<GttsViaHttpTts>();
 		Services.AddHostedService<RimeTtsWorker>();
 
