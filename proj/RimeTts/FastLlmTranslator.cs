@@ -29,8 +29,6 @@ public sealed class FastLlmTranslator(
 		var systemPrompt = Req.SystemPrompt?.Trim() ?? "";
 		var source = Req.SourceText;
 		var targetLang = NormalizeTargetLang(Req.TargetLanguage);
-		var userInputLang = DetectUserInputLang(source);
-
 		if(source.Length == 0){
 			return new RespTranslate{ SourceText = "", TargetLanguage = targetLang, TranslatedText = "" };
 		}
@@ -94,11 +92,6 @@ public sealed class FastLlmTranslator(
 				return new RespTranslate{ SourceText = source, TargetLanguage = targetLang, TranslatedText = null };
 			}
 
-			if(!IsUserInputLangAcceptable(userInputLang, parsed.UserInputLang)){
-				Log.LogWarning("translator user input lang mismatch. expected={Expected}; actual={Actual}; source={Source}; response={Response}", userInputLang, parsed.UserInputLang ?? "", source, SummarizeText(yamlText));
-				return new RespTranslate{ SourceText = source, TargetLanguage = targetLang, TranslatedText = null };
-			}
-
 		str? translated = parsed.Translation?.Trim();
 		if(string.IsNullOrWhiteSpace(translated) || IsYamlNullLiteral(translated)){
 			translated = null;
@@ -142,50 +135,10 @@ public sealed class FastLlmTranslator(
 		};
 	}
 
-	private static str DetectUserInputLang(str source){
-		if(source.Length == 0){
-			return "und";
-		}
-
-		var hasCjk = source.Any(c =>
-			(c >= '\u4e00' && c <= '\u9fff')
-			|| (c >= '\u3400' && c <= '\u4dbf')
-			|| (c >= '\u3040' && c <= '\u30ff')
-		);
-		if(hasCjk){
-			return "zh";
-		}
-
-		var hasLatin = source.Any(c => (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'));
-		if(hasLatin){
-			return "en";
-		}
-
-		return "und";
-	}
-
 	private static bool IsTargetLangAcceptable(str expected, str? actual){
 		var normExpected = NormalizeTargetLang(expected);
 		var normActual = NormalizeTargetLang(actual);
 		return string.Equals(normExpected, normActual, StringComparison.OrdinalIgnoreCase);
-	}
-
-	private static bool IsUserInputLangAcceptable(str expected, str? actual){
-		var normExpected = NormalizeLangTag(expected);
-		var normActual = NormalizeLangTag(actual);
-		return string.Equals(normExpected, normActual, StringComparison.OrdinalIgnoreCase);
-	}
-
-	private static str NormalizeLangTag(str? lang){
-		if(string.IsNullOrWhiteSpace(lang)){
-			return "";
-		}
-
-		var norm = lang.Trim().ToLowerInvariant();
-		return norm switch{
-			"jp" => "ja",
-			_ => norm,
-		};
 	}
 
 	private static bool IsYamlNullLiteral(str text){

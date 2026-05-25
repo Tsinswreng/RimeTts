@@ -6,7 +6,7 @@
   Rime Lua 插件把上屏文字寫入文件，C\# 服務按語言流水線逐個翻譯並朗讀。
 
   #H[AI 輸出格式][
-    請在 `rimetts.yaml` 裡自行定義提示詞，AI 回應需為 YAML：
+    請在 `rimetts.yaml` 裡自行定義提示詞，AI 自行檢測 `UserInputLang`，回應需為 YAML：
     ```yaml
     UserInputLang: zh
     TargetLang: en

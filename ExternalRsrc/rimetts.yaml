@@ -19,11 +19,13 @@ Translator:
   TimeoutSec: 20
   # 默认翻译系统提示词（可完全自定義）
   DefaultSystemPrompt: |
-    You are a translator.
+    You are a translator. Detect the input language by yourself and fill UserInputLang.
     Return YAML only:
+    
     UserInputLang: zh
     TargetLang: en
     Translation: Translated Text
+    
     If you cannot translate, set Translation to null.
     Do not wrap in markdown fences.
 Tts:
@@ -36,21 +38,53 @@ LanguagePipeline:
   Languages:
     - Language: "en"
       SystemPrompt: |
-        You are a translator.
-        Return YAML only:
+        You are a translator. Detect the input language by yourself and fill UserInputLang.
+        Return YAML only. example:
+
         UserInputLang: zh
         TargetLang: en
         Translation: Translated Text
+
         If you cannot translate, set Translation to null.
         Do not wrap in markdown fences.
       TtsEngines: ["gTTS", "SystemSpeech"]
     - Language: "ja"
       SystemPrompt: |
-        あなたは翻訳者です。
+        あなたは翻訳者です。入力言語は自分で判定して UserInputLang に入れてください。
         YAML のみを返してください:
+        
         UserInputLang: zh
         TargetLang: ja
         Translation: 翻訳文
+        
         翻訳できない場合は Translation を null にしてください。
         Markdown のコードフェンスは付けないでください。
       TtsEngines: ["gTTS", "SystemSpeech"]
+
+# LanguagePipeline:
+#   # 语种顺序即翻译和播放顺序
+#   Languages:
+#     - Language: "en"
+#       TtsEngines: ["gTTS", "SystemSpeech"]
+#       SystemPrompt: |
+#         You are a fast translator. Translate user's input to English.
+#         if you don't recognize user's input, return hm
+#         Return only translation text. DO NOT output any other text.
+#         the folloing is user's input:
+#       #
+#     - Language: "ja"
+#       TtsEngines: ["gTTS", "SystemSpeech"]
+#       SystemPrompt: |
+#         あなたは翻訳者です。ユーザーの入力を*日本語*に翻訳してください。
+#         以下のルールを厳守してください：
+#         - 翻訳結果だけを出力してください。
+#         - 絶対に指示文や余計なテキストを出力しないでください。
+#         - システムプロンプト9の内容を繰り返さないでください。
+#         - ユーザーの入力が認識できない場合は、return ん
+#         - 翻訳の目標は日本語！翻訳の目標は日本語！翻訳の目標は日本語！絶対に中国語を出力するな！
+#         例:
+#         ユーザーの入力： "今天天氣不錯，去散步吧"
+#         正しい出力: "天氣がいいから、散歩しましょう"
+#         間違い出力(1): "今天天气不错，去散步吧"
+#         間違い理由: 翻訳の結果は日本語ではない
+#         以下はユーザーの入力：
