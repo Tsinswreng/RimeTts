@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Hosting;
@@ -25,10 +26,15 @@ public sealed class RimeTtsWorker(
 	private DateTimeOffset _lastCommitAtUtc = DateTimeOffset.MinValue;
 	private readonly Channel<ISentence> _sentenceQ = Channel.CreateUnbounded<ISentence>();
 	private readonly Channel<AudioJob> _audioQ = Channel.CreateUnbounded<AudioJob>();
+	private readonly Lock _playbackLock = new();
+	private CancellationTokenSource? _currentPlaybackCts;
+	private GlobalEscKeyHook? _escHook;
 
 	protected override async Task ExecuteAsync(CT StoppingToken){
 		TypingListener.CommitReceived += OnCommit;
 		TypingListener.KeyEventReceived += OnKeyEvent;
+		_escHook = new GlobalEscKeyHook(StopCurrentPlayback, Log);
+		_escHook.Start();
 		await TypingListener.StartAsync(StoppingToken);
 
 		//Log.LogInformation("worker started");
@@ -39,8 +45,11 @@ public sealed class RimeTtsWorker(
 			await Task.WhenAll(timerTask, consumeTask, audioTask);
 		}
 		finally{
+			_escHook?.Dispose();
+			_escHook = null;
 			TypingListener.CommitReceived -= OnCommit;
 			TypingListener.KeyEventReceived -= OnKeyEvent;
+			StopCurrentPlayback();
 			await TypingListener.StopAsync(CancellationToken.None);
 		}
 	}
@@ -180,9 +189,9 @@ public sealed class RimeTtsWorker(
 				TargetLanguage = lang,
 				SystemPrompt = prompt,
 			}, Ct);
-			var target = tr.TranslatedText.Trim();
-			if(target.Length == 0){
-				Log.LogWarning("translation empty. source={Source}; lang={Lang}", source, lang);
+			var target = tr.TranslatedText?.Trim();
+			if(string.IsNullOrWhiteSpace(target)){
+				Log.LogWarning("translation empty or null; skip speak. source={Source}; lang={Lang}", source, lang);
 				return null;
 			}
 			Log.LogTranslationText(target);
@@ -245,13 +254,20 @@ public sealed class RimeTtsWorker(
 
 	private async Task PlayAudioWithTimeout(str audioFile, str lang, CT outerCt){
 		var timeout = GetAudioPlayTimeout(audioFile);
-		using var cts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
-		cts.CancelAfter(timeout);
+		using var timeoutCts = new CancellationTokenSource(timeout);
+		using var playbackCts = CancellationTokenSource.CreateLinkedTokenSource(outerCt, timeoutCts.Token);
+		SetCurrentPlayback(playbackCts);
 		try{
-			await Tts.PlayAudio(audioFile, cts.Token);
+			await Tts.PlayAudio(audioFile, playbackCts.Token);
 		}
-		catch(OperationCanceledException) when(!outerCt.IsCancellationRequested && cts.IsCancellationRequested){
+		catch(OperationCanceledException) when(!outerCt.IsCancellationRequested && timeoutCts.IsCancellationRequested){
 			Log.LogWarning("audio play timed out. lang={Lang}; file={AudioFile}; timeoutSec={TimeoutSec}", lang, audioFile, timeout.TotalSeconds);
+		}
+		catch(OperationCanceledException) when(!outerCt.IsCancellationRequested && playbackCts.IsCancellationRequested){
+			Log.LogWarning("audio play canceled by global esc. lang={Lang}; file={AudioFile}", lang, audioFile);
+		}
+		finally{
+			ClearCurrentPlayback(playbackCts);
 		}
 	}
 
@@ -337,5 +353,171 @@ public sealed class RimeTtsWorker(
 		public str Language{get;set;} = "";
 		public str TranslatedText{get;set;} = "";
 		public List<str>? PreferredEngines{get;set;}
+	}
+
+	private sealed class GlobalEscKeyHook : IDisposable{
+		private const int WH_KEYBOARD_LL = 13;
+		private const int WM_KEYDOWN = 0x0100;
+		private const int WM_SYSKEYDOWN = 0x0104;
+		private const uint WM_QUIT = 0x0012;
+		private const int VK_ESCAPE = 0x1B;
+		private readonly Action _onEsc;
+		private readonly ILogger _log;
+		private readonly ManualResetEventSlim _ready = new(false);
+		private readonly LowLevelKeyboardProc _proc;
+		private IntPtr _hook = IntPtr.Zero;
+		private uint _threadId;
+		private Thread? _thread;
+		private bool _started;
+
+		public GlobalEscKeyHook(Action onEsc, ILogger log){
+			_onEsc = onEsc;
+			_log = log;
+			_proc = HookCallback;
+		}
+
+		public void Start(){
+			if(_started){
+				return;
+			}
+			_thread = new Thread(HookThreadMain){
+				IsBackground = true,
+				Name = "RimeTts.GlobalEscHook",
+			};
+			_thread.Start();
+			_ready.Wait();
+			if(_hook == IntPtr.Zero){
+				throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "failed to install global esc hook");
+			}
+			_started = true;
+			_log.LogInformation("global esc hook started");
+		}
+
+		public void Dispose(){
+			if(_threadId != 0){
+				PostThreadMessage(_threadId, WM_QUIT, IntPtr.Zero, IntPtr.Zero);
+			}
+			_thread?.Join(TimeSpan.FromSeconds(2));
+			if(_hook != IntPtr.Zero){
+				UnhookWindowsHookEx(_hook);
+				_hook = IntPtr.Zero;
+			}
+			_ready.Dispose();
+		}
+
+		private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam){
+			if(nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN)){
+				var kb = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
+				if(kb.vkCode == VK_ESCAPE){
+					_onEsc();
+				}
+			}
+			return CallNextHookEx(_hook, nCode, wParam, lParam);
+		}
+
+		private void HookThreadMain(){
+			_threadId = GetCurrentThreadId();
+			using var curProcess = System.Diagnostics.Process.GetCurrentProcess();
+			using var curModule = curProcess.MainModule;
+			var moduleName = curModule?.ModuleName ?? "";
+			var moduleHandle = GetModuleHandle(moduleName);
+			_hook = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, moduleHandle, 0);
+			_ready.Set();
+			if(_hook == IntPtr.Zero){
+				return;
+			}
+
+			try{
+				while(GetMessage(out var msg, IntPtr.Zero, 0, 0) > 0){
+					TranslateMessage(ref msg);
+					DispatchMessage(ref msg);
+				}
+			}
+			finally{
+				if(_hook != IntPtr.Zero){
+					UnhookWindowsHookEx(_hook);
+					_hook = IntPtr.Zero;
+				}
+			}
+		}
+
+		private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+		[StructLayout(LayoutKind.Sequential)]
+		private struct MSG{
+			public IntPtr hwnd;
+			public uint message;
+			public IntPtr wParam;
+			public IntPtr lParam;
+			public uint time;
+			public POINT pt;
+			public uint lPrivate;
+		}
+
+		[StructLayout(LayoutKind.Sequential)]
+		private struct POINT{
+			public int x;
+			public int y;
+		}
+
+		[StructLayout(LayoutKind.Sequential)]
+		private struct KBDLLHOOKSTRUCT{
+			public uint vkCode;
+			public uint scanCode;
+			public uint flags;
+			public uint time;
+			public IntPtr dwExtraInfo;
+		}
+
+		[DllImport("user32.dll", SetLastError = true)]
+		private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+
+		[DllImport("user32.dll", SetLastError = true)]
+		[return: MarshalAs(UnmanagedType.Bool)]
+		private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+		[DllImport("user32.dll")]
+		private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+		[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+		private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+		[DllImport("user32.dll", SetLastError = true)]
+		private static extern sbyte GetMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+
+		[DllImport("user32.dll")]
+		private static extern bool TranslateMessage([In] ref MSG lpMsg);
+
+		[DllImport("user32.dll")]
+		private static extern IntPtr DispatchMessage([In] ref MSG lpmsg);
+
+		[DllImport("user32.dll", SetLastError = true)]
+		private static extern bool PostThreadMessage(uint idThread, uint Msg, IntPtr wParam, IntPtr lParam);
+
+		[DllImport("kernel32.dll")]
+		private static extern uint GetCurrentThreadId();
+	}
+
+	private void SetCurrentPlayback(CancellationTokenSource cts){
+		lock(_playbackLock){
+			_currentPlaybackCts?.Cancel();
+			_currentPlaybackCts?.Dispose();
+			_currentPlaybackCts = cts;
+		}
+	}
+
+	private void ClearCurrentPlayback(CancellationTokenSource cts){
+		lock(_playbackLock){
+			if(ReferenceEquals(_currentPlaybackCts, cts)){
+				_currentPlaybackCts?.Dispose();
+				_currentPlaybackCts = null;
+			}
+		}
+	}
+
+	private void StopCurrentPlayback(){
+		lock(_playbackLock){
+			_currentPlaybackCts?.Cancel();
+		}
 	}
 }

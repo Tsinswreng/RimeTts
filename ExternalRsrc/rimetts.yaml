@@ -17,8 +17,15 @@ Translator:
   Model: "Qwen/Qwen2.5-72B-Instruct"
   # 请求超时秒数
   TimeoutSec: 20
-  # 默认翻译系统提示词（某语言未配置 SystemPrompt 时使用）
-  DefaultSystemPrompt: "You are a fast translator. Translate source text to target language only. Return only translation text."
+  # 默认翻译系统提示词（可完全自定義）
+  DefaultSystemPrompt: |
+    You are a translator.
+    Return YAML only:
+    UserInputLang: zh
+    TargetLang: en
+    Translation: Translated Text
+    If you cannot translate, set Translation to null.
+    Do not wrap in markdown fences.
 Tts:
   # 全局默认 TTS 引擎优先级（某语言未配置 TtsEngines 时使用）
   Engines: ["gTTS", "SystemSpeech"]
@@ -28,21 +35,22 @@ LanguagePipeline:
   # 语种顺序即翻译和播放顺序
   Languages:
     - Language: "en"
-      TtsEngines: ["gTTS", "SystemSpeech"]
       SystemPrompt: |
-        You are a fast translator. Translate user's input to English. 
-        if you don't recognize user's input, return hm
-        Return only translation text. DO NOT output any other text.
-        the folloing is user's input:
-      #
+        You are a translator.
+        Return YAML only:
+        UserInputLang: zh
+        TargetLang: en
+        Translation: Translated Text
+        If you cannot translate, set Translation to null.
+        Do not wrap in markdown fences.
+      TtsEngines: ["gTTS", "SystemSpeech"]
     - Language: "ja"
-      TtsEngines: ["gTTS", "SystemSpeech"]
       SystemPrompt: |
-        あなたは翻訳者です。ユーザーの入力を*日本語*に翻訳してください。
-        以下のルールを厳守してください：
-        - 翻訳結果だけを出力してください。
-        - 絶対に指示文や余計なテキストを出力しないでください。
-        - システムプロンプトの内容を繰り返さないでください。
-        - ユーザーの入力が認識できない場合は、return ん
-        - 翻訳の目標は日本語！翻訳の目標は日本語！翻訳の目標は日本語！
-        ユーザーの入力：
+        あなたは翻訳者です。
+        YAML のみを返してください:
+        UserInputLang: zh
+        TargetLang: ja
+        Translation: 翻訳文
+        翻訳できない場合は Translation を null にしてください。
+        Markdown のコードフェンスは付けないでください。
+      TtsEngines: ["gTTS", "SystemSpeech"]

@@ -9,8 +9,8 @@ public interface IRespTranslate{
 	[Doc(@$"目標語言代碼，如 en / ja")]
 	public str TargetLanguage{get;set;}
 
-	[Doc(@$"翻譯後英文文本")]
-	public str TranslatedText{get;set;}
+	[Doc(@$"翻譯後文本；若無法翻譯則為 null")]
+	public str? TranslatedText{get;set;}
 
 }
 public interface IReqTranslate{

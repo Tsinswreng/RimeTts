@@ -3,6 +3,8 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
 namespace RimeTts;
 
@@ -10,7 +12,12 @@ public sealed class FastLlmTranslator(
 	OptTranslator Opt,
 	ILogger<FastLlmTranslator> Log
 ):ITranslator{
-	private readonly Dictionary<str, str> _cache = new();
+	private static readonly IDeserializer YamlDeserializer = new DeserializerBuilder()
+		.WithNamingConvention(NullNamingConvention.Instance)
+		.IgnoreUnmatchedProperties()
+		.Build();
+
+	private readonly Dictionary<str, str?> _cache = new();
 	private readonly Lock _lock = new();
 	private readonly SemaphoreSlim _translateGate = new(1, 1);
 
@@ -18,20 +25,22 @@ public sealed class FastLlmTranslator(
 		if(Req is null){
 			throw new ArgumentNullException(nameof(Req));
 		}
-		var systemPrompt = Req.SystemPrompt;
-		var source = Req.SourceText;
 
+		var systemPrompt = Req.SystemPrompt?.Trim() ?? "";
+		var source = Req.SourceText;
 		var targetLang = NormalizeTargetLang(Req.TargetLanguage);
+		var userInputLang = DetectUserInputLang(source);
 
 		if(source.Length == 0){
 			return new RespTranslate{ SourceText = "", TargetLanguage = targetLang, TranslatedText = "" };
 		}
 
 		var cacheKey = $"{targetLang}\n{systemPrompt}\n{source}";
-
 		lock(_lock){
 			if(_cache.TryGetValue(cacheKey, out var cached)){
-				Log.LogTranslationCacheText(cached);
+				if(!string.IsNullOrWhiteSpace(cached)){
+					Log.LogTranslationCacheText(cached);
+				}
 				return new RespTranslate{ SourceText = source, TargetLanguage = targetLang, TranslatedText = cached };
 			}
 		}
@@ -61,23 +70,44 @@ public sealed class FastLlmTranslator(
 			cts.CancelAfter(TimeSpan.FromSeconds(Math.Max(3, Opt.TimeoutSec)));
 
 			using var resp = await http.SendAsync(reqMsg, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-			if (!resp.IsSuccessStatusCode){
+			if(!resp.IsSuccessStatusCode){
 				var errorContent = await resp.Content.ReadAsStringAsync();
 				Log.LogError("translator http failed. statusCode={StatusCode}; reason={ReasonPhrase}; body={Body}; source={Source}; lang={Lang}", (int)resp.StatusCode, resp.ReasonPhrase, errorContent, source, targetLang);
 				throw new HttpRequestException($"Response status code does not indicate success: {(int)resp.StatusCode} ({resp.ReasonPhrase}). Details: {errorContent}");
 			}
-			resp.EnsureSuccessStatusCode();
 
 			var json = await resp.Content.ReadAsStringAsync(cts.Token);
-			var translated = ExtractContent(json).Trim();
-			if(translated.Length == 0){
+			var yamlText = ExtractContent(json).Trim();
+			if(yamlText.Length == 0){
 				Log.LogError("translator response content empty. source={Source}; lang={Lang}; response={Response}", source, targetLang, SummarizeJson(json));
 				throw new InvalidOperationException("translator response content is empty");
 			}
 
-			lock(_lock){
+			var parsed = ParseYaml(yamlText);
+			if(parsed is null){
+				Log.LogWarning("translator response yaml invalid. source={Source}; lang={Lang}; response={Response}", source, targetLang, SummarizeText(yamlText));
+				return new RespTranslate{ SourceText = source, TargetLanguage = targetLang, TranslatedText = null };
+			}
+
+			if(!IsTargetLangAcceptable(targetLang, parsed.TargetLang)){
+				Log.LogWarning("translator target lang mismatch. expected={Expected}; actual={Actual}; source={Source}; response={Response}", targetLang, parsed.TargetLang ?? "", source, SummarizeText(yamlText));
+				return new RespTranslate{ SourceText = source, TargetLanguage = targetLang, TranslatedText = null };
+			}
+
+			if(!IsUserInputLangAcceptable(userInputLang, parsed.UserInputLang)){
+				Log.LogWarning("translator user input lang mismatch. expected={Expected}; actual={Actual}; source={Source}; response={Response}", userInputLang, parsed.UserInputLang ?? "", source, SummarizeText(yamlText));
+				return new RespTranslate{ SourceText = source, TargetLanguage = targetLang, TranslatedText = null };
+			}
+
+		str? translated = parsed.Translation?.Trim();
+		if(string.IsNullOrWhiteSpace(translated) || IsYamlNullLiteral(translated)){
+			translated = null;
+		}
+
+		lock(_lock){
 				_cache[cacheKey] = translated;
 			}
+
 			return new RespTranslate{ SourceText = source, TargetLanguage = targetLang, TranslatedText = translated };
 		}
 		finally{
@@ -110,6 +140,65 @@ public sealed class FastLlmTranslator(
 			"jp" => "ja",
 			_ => norm,
 		};
+	}
+
+	private static str DetectUserInputLang(str source){
+		if(source.Length == 0){
+			return "und";
+		}
+
+		var hasCjk = source.Any(c =>
+			(c >= '\u4e00' && c <= '\u9fff')
+			|| (c >= '\u3400' && c <= '\u4dbf')
+			|| (c >= '\u3040' && c <= '\u30ff')
+		);
+		if(hasCjk){
+			return "zh";
+		}
+
+		var hasLatin = source.Any(c => (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'));
+		if(hasLatin){
+			return "en";
+		}
+
+		return "und";
+	}
+
+	private static bool IsTargetLangAcceptable(str expected, str? actual){
+		var normExpected = NormalizeTargetLang(expected);
+		var normActual = NormalizeTargetLang(actual);
+		return string.Equals(normExpected, normActual, StringComparison.OrdinalIgnoreCase);
+	}
+
+	private static bool IsUserInputLangAcceptable(str expected, str? actual){
+		var normExpected = NormalizeLangTag(expected);
+		var normActual = NormalizeLangTag(actual);
+		return string.Equals(normExpected, normActual, StringComparison.OrdinalIgnoreCase);
+	}
+
+	private static str NormalizeLangTag(str? lang){
+		if(string.IsNullOrWhiteSpace(lang)){
+			return "";
+		}
+
+		var norm = lang.Trim().ToLowerInvariant();
+		return norm switch{
+			"jp" => "ja",
+			_ => norm,
+		};
+	}
+
+	private static bool IsYamlNullLiteral(str text){
+		return text.Equals("null", StringComparison.OrdinalIgnoreCase) || text.Equals("~", StringComparison.Ordinal);
+	}
+
+	private static YamlTranslateResp? ParseYaml(str yamlText){
+		try{
+			return YamlDeserializer.Deserialize<YamlTranslateResp>(yamlText);
+		}
+		catch{
+			return null;
+		}
 	}
 
 	private static str ExtractContent(str Json){
@@ -229,5 +318,13 @@ public sealed class FastLlmTranslator(
 			return json;
 		}
 		return json[..maxLen] + "...";
+	}
+
+	private static str SummarizeText(str text){
+		const int maxLen = 800;
+		if(text.Length <= maxLen){
+			return text;
+		}
+		return text[..maxLen] + "...";
 	}
 }

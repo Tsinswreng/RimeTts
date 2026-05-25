@@ -24,7 +24,15 @@ public sealed class TranslatorSection{
 	public str BaseUrl{get;set;} = "https://api.openai.com/v1/chat/completions";
 	public str Model{get;set;} = "gpt-4o-mini";
 	public i32 TimeoutSec{get;set;} = 20;
-	public str DefaultSystemPrompt{get;set;} = "You are a fast translator. Translate source text to target language only. Return only translation text.";
+	public str DefaultSystemPrompt{get;set;} = """
+You are a translator.
+Return YAML only:
+UserInputLang: zh
+TargetLang: en
+Translation: Translated Text
+If you cannot translate, set Translation to null.
+Do not wrap in markdown fences.
+""";
 }
 
 public sealed class TtsSection{
@@ -36,12 +44,28 @@ public sealed class LanguagePipelineSection{
 	public List<LanguageProfileSection> Languages{get;set;} = new(){
 		new LanguageProfileSection{
 			Language = "en",
-			SystemPrompt = "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text.",
+			SystemPrompt = """
+You are a translator.
+Return YAML only:
+UserInputLang: zh
+TargetLang: en
+Translation: Translated Text
+If you cannot translate, set Translation to null.
+Do not wrap in markdown fences.
+""",
 			TtsEngines = new(){ "gTTS", "SystemSpeech" },
 		},
 		new LanguageProfileSection{
 			Language = "ja",
-			SystemPrompt = "あなたは高速な翻訳者です。中国語を自然で簡潔な日本語に翻訳してください。翻訳結果の本文のみを返してください。",
+			SystemPrompt = """
+あなたは翻訳者です。
+YAML のみを返してください:
+UserInputLang: zh
+TargetLang: ja
+Translation: 翻訳文
+翻訳できない場合は Translation を null にしてください。
+Markdown のコードフェンスは付けないでください。
+""",
 			TtsEngines = new(){ "gTTS", "SystemSpeech" },
 		},
 	};

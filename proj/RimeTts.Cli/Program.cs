@@ -80,7 +80,7 @@ builder.Services.AddRimeTts(
 			opt.Languages = new List<ILanguageProfile>{
 				new LanguageProfile{
 					Language = "en",
-					SystemPrompt = "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text.",
+					SystemPrompt = "You are a fast translator. Translate to concise natural English. Return YAML only with keys UserInputLang, TargetLang, Translation. UserInputLang and TargetLang must be BCP-47 language tags. TargetLang must be en. If you cannot translate, set Translation to null. Do not wrap the YAML in markdown fences.",
 					TtsEngines = new(){ "gTTS", "SystemSpeech" },
 				}
 			};

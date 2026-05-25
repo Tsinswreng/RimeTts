@@ -24,7 +24,13 @@ public sealed class ReqTranslate:IReqTranslate{
 public sealed class RespTranslate:IRespTranslate{
 	public str SourceText{get;set;} = "";
 	public str TargetLanguage{get;set;} = "en";
-	public str TranslatedText{get;set;} = "";
+	public str? TranslatedText{get;set;} = "";
+}
+
+public sealed class YamlTranslateResp{
+	public str? UserInputLang{get;set;}
+	public str? TargetLang{get;set;}
+	public str? Translation{get;set;}
 }
 
 public sealed class ReqGenEtPlay:IReqGenEtPlay{
@@ -54,7 +60,7 @@ public sealed class OptTranslator{
 	public str BaseUrl{get;set;} = "https://api.openai.com/v1/chat/completions";
 	public str Model{get;set;} = "gpt-4o-mini";
 	public i32 TimeoutSec{get;set;} = 20;
-	public str DefaultSystemPrompt{get;set;} = "You are a fast translator. Translate source text to target language only. Return only translation text.";
+	public str DefaultSystemPrompt{get;set;} = "You are a fast translator. Return YAML only with keys UserInputLang, TargetLang, Translation. UserInputLang and TargetLang must be BCP-47 language tags. If you cannot translate, set Translation to null. Do not wrap the YAML in markdown fences.";
 }
 
 public sealed class OptTts{
@@ -76,7 +82,7 @@ public sealed class OptLanguagePipeline:IOptLanguagePipeline{
 	public List<ILanguageProfile> Languages{get;set;} = new List<ILanguageProfile>{
 		new LanguageProfile{
 			Language = "en",
-			SystemPrompt = "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text.",
+			SystemPrompt = "",
 			TtsEngines = new(){ "gTTS", "SystemSpeech" },
 		}
 	};
@@ -84,6 +90,6 @@ public sealed class OptLanguagePipeline:IOptLanguagePipeline{
 
 public sealed class LanguageProfile:ILanguageProfile{
 	public str Language{get;set;} = "en";
-	public str SystemPrompt{get;set;} = "You are a fast translator. Translate source text to target language only. Return only translation text.";
+	public str SystemPrompt{get;set;} = "";
 	public List<str> TtsEngines{get;set;} = new(){ "gTTS", "SystemSpeech" };
 }

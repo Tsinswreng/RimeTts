@@ -56,7 +56,14 @@ Translator:
   # 请求超时秒数
 	TimeoutSec: 20
   # 默认翻译系统提示词（当语言条目未显式设置时使用）
-	DefaultSystemPrompt: "You are a fast translator. Translate source text to target language only. Return only translation text."
+	DefaultSystemPrompt: |
+	  You are a translator.
+	  Return YAML only:
+	  UserInputLang: zh
+	  TargetLang: en
+	  Translation: Translated Text
+	  If you cannot translate, set Translation to null.
+	  Do not wrap in markdown fences.
 
 Tts:
 	# TTS 引擎优先级，越靠前优先级越高。默认先 gTTS 再 SystemSpeech
@@ -68,10 +75,24 @@ LanguagePipeline:
 	# 語言順序即播放順序，按列表從上到下依次翻譯並朗讀
 	Languages:
 		- Language: "en"
-			SystemPrompt: "You are a fast translator. Translate Chinese to concise natural English only. Return only translation text."
+			SystemPrompt: |
+			  You are a translator.
+			  Return YAML only:
+			  UserInputLang: zh
+			  TargetLang: en
+			  Translation: Translated Text
+			  If you cannot translate, set Translation to null.
+			  Do not wrap in markdown fences.
 			TtsEngines: ["gTTS", "SystemSpeech"]
 		- Language: "ja"
-			SystemPrompt: "あなたは高速な翻訳者です。中国語を自然で簡潔な日本語に翻訳してください。翻訳結果の本文のみを返してください。"
+			SystemPrompt: |
+			  あなたは翻訳者です。
+			  YAML のみを返してください:
+			  UserInputLang: zh
+			  TargetLang: ja
+			  Translation: 翻訳文
+			  翻訳できない場合は Translation を null にしてください。
+			  Markdown のコードフェンスは付けないでください。
 			TtsEngines: ["gTTS", "SystemSpeech"]
 """;
 	}
