@@ -122,18 +122,32 @@ public sealed class SystemSpeechTts(
 	}
 
 	private static Task PlayWavWindowsAsync(str wavPath, CT Ct){
-		return Task.Run(() => {
+		return Task.Run(async () => {
 			Ct.ThrowIfCancellationRequested();
 			using var stream = File.OpenRead(wavPath);
 			using WaveStream reader = new WaveFileReader(stream);
 			using var waveOut = new WaveOutEvent();
+			var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+			waveOut.PlaybackStopped += (_, e) => {
+				if(e.Exception is not null){
+					tcs.TrySetException(e.Exception);
+				} else {
+					tcs.TrySetResult();
+				}
+			};
+
+			using var reg = Ct.Register(() => {
+				try{
+					waveOut.Stop();
+				}
+				catch{
+				}
+				tcs.TrySetCanceled(Ct);
+			});
+
 			waveOut.Init(reader);
 			waveOut.Play();
-
-			while(waveOut.PlaybackState == PlaybackState.Playing){
-				Ct.ThrowIfCancellationRequested();
-				Thread.Sleep(100);
-			}
+			await tcs.Task;
 		}, Ct);
 	}
 

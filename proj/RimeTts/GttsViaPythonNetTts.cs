@@ -126,18 +126,32 @@ public sealed class GttsViaHttpTts(
 			throw new PlatformNotSupportedException("windows only");
 		}
 
-		return Task.Run(() => {
+		return Task.Run(async () => {
 			Ct.ThrowIfCancellationRequested();
 			using var stream = File.OpenRead(mp3Path);
 			using WaveStream reader = new Mp3FileReader(stream);
 			using var waveOut = new WaveOutEvent();
+			var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+			waveOut.PlaybackStopped += (_, e) => {
+				if(e.Exception is not null){
+					tcs.TrySetException(e.Exception);
+				} else {
+					tcs.TrySetResult();
+				}
+			};
+
+			using var reg = Ct.Register(() => {
+				try{
+					waveOut.Stop();
+				}
+				catch{
+				}
+				tcs.TrySetCanceled(Ct);
+			});
+
 			waveOut.Init(reader);
 			waveOut.Play();
-
-			while(waveOut.PlaybackState == PlaybackState.Playing){
-				Ct.ThrowIfCancellationRequested();
-				Thread.Sleep(100);
-			}
+			await tcs.Task;
 		}, Ct);
 	}
 

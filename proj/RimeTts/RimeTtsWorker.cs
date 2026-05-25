@@ -1,7 +1,9 @@
+using System.IO;
 using System.Text;
 using System.Threading.Channels;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using NAudio.Wave;
 
 namespace RimeTts;
 
@@ -15,7 +17,8 @@ public sealed class RimeTtsWorker(
 ):BackgroundService{
 	private static readonly TimeSpan PerTranslationTimeout = TimeSpan.FromSeconds(20);
 	private static readonly TimeSpan PerAudioGenerateTimeout = TimeSpan.FromSeconds(40);
-	private static readonly TimeSpan PerAudioPlayTimeout = TimeSpan.FromSeconds(20);
+	private static readonly TimeSpan MinAudioPlayTimeout = TimeSpan.FromSeconds(20);
+	private static readonly TimeSpan AudioPlayGrace = TimeSpan.FromSeconds(10);
 	private static readonly SemaphoreSlim SentenceGate = new(2, 2);
 	private readonly Lock _bufLock = new();
 	private readonly StringBuilder _buf = new();
@@ -241,13 +244,48 @@ public sealed class RimeTtsWorker(
 	}
 
 	private async Task PlayAudioWithTimeout(str audioFile, str lang, CT outerCt){
+		var timeout = GetAudioPlayTimeout(audioFile);
 		using var cts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
-		cts.CancelAfter(PerAudioPlayTimeout);
+		cts.CancelAfter(timeout);
 		try{
 			await Tts.PlayAudio(audioFile, cts.Token);
 		}
 		catch(OperationCanceledException) when(!outerCt.IsCancellationRequested && cts.IsCancellationRequested){
-			Log.LogWarning("audio play timed out. lang={Lang}; file={AudioFile}; timeoutSec={TimeoutSec}", lang, audioFile, PerAudioPlayTimeout.TotalSeconds);
+			Log.LogWarning("audio play timed out. lang={Lang}; file={AudioFile}; timeoutSec={TimeoutSec}", lang, audioFile, timeout.TotalSeconds);
+		}
+	}
+
+	private static TimeSpan GetAudioPlayTimeout(str audioFile){
+		try{
+			using WaveStream reader = OpenWaveStream(audioFile);
+			var duration = reader.TotalTime;
+			if(duration <= TimeSpan.Zero){
+				return MinAudioPlayTimeout;
+			}
+			var timeout = duration + AudioPlayGrace;
+			return timeout > MinAudioPlayTimeout ? timeout : MinAudioPlayTimeout;
+		}
+		catch{
+			return MinAudioPlayTimeout;
+		}
+	}
+
+	private static WaveStream OpenWaveStream(str audioFile){
+		var ext = Path.GetExtension(audioFile).ToLowerInvariant();
+		var stream = File.OpenRead(audioFile);
+		try{
+			if(ext == ".mp3"){
+				return new Mp3FileReader(stream);
+			}
+			if(ext == ".wav"){
+				return new WaveFileReader(stream);
+			}
+			stream.Dispose();
+			return new AudioFileReader(audioFile);
+		}
+		catch{
+			stream.Dispose();
+			throw;
 		}
 	}
 

@@ -10,7 +10,6 @@ public sealed class OrderedFallbackTts(
 	ILogger<OrderedFallbackTts> Log
 ):ITts{
 	private static readonly TimeSpan GenerateTimeout = TimeSpan.FromSeconds(12);
-	private static readonly TimeSpan PlayTimeout = TimeSpan.FromSeconds(20);
 
 	public async Task<IPlayState> GenEtPlay(IReqGenEtPlay Req, CT Ct){
 		var sourceEngines = Req.PreferredEngines is { Count: > 0 }
@@ -32,7 +31,7 @@ public sealed class OrderedFallbackTts(
 						engine,
 						"gen-play",
 						innerCt => Gtts.GenEtPlay(Req, innerCt),
-						PlayTimeout,
+						TimeSpan.FromMinutes(5),
 						Ct
 					);
 				}
@@ -43,7 +42,7 @@ public sealed class OrderedFallbackTts(
 						engine,
 						"gen-play",
 						innerCt => SystemSpeech.GenEtPlay(Req, innerCt),
-						PlayTimeout,
+						TimeSpan.FromMinutes(5),
 						Ct
 					);
 				}
@@ -117,29 +116,11 @@ public sealed class OrderedFallbackTts(
 		var ext = Path.GetExtension(AudioFile).ToLowerInvariant();
 		try{
 			if(ext == ".mp3"){
-				await RunWithTimeout(
-					"gTTS",
-					"play",
-					innerCt => Gtts.PlayAudio(AudioFile, innerCt),
-					PlayTimeout,
-					Ct
-				);
+				await Gtts.PlayAudio(AudioFile, Ct);
 			} else if(ext == ".wav"){
-				await RunWithTimeout(
-					"SystemSpeech",
-					"play",
-					innerCt => SystemSpeech.PlayAudio(AudioFile, innerCt),
-					PlayTimeout,
-					Ct
-				);
+				await SystemSpeech.PlayAudio(AudioFile, Ct);
 			} else {
-				await RunWithTimeout(
-					"gTTS",
-					"play",
-					innerCt => Gtts.PlayAudio(AudioFile, innerCt),
-					PlayTimeout,
-					Ct
-				);
+				await Gtts.PlayAudio(AudioFile, Ct);
 			}
 		}
 		catch(OperationCanceledException){
@@ -147,13 +128,7 @@ public sealed class OrderedFallbackTts(
 		}
 		catch(Exception ex){
 			Log.LogWarning(ex, "play audio failed with gTTS, try system speech. file={AudioFile}", AudioFile);
-			await RunWithTimeout(
-				"SystemSpeech",
-				"play-fallback",
-				innerCt => SystemSpeech.PlayAudio(AudioFile, innerCt),
-				PlayTimeout,
-				Ct
-			);
+			await SystemSpeech.PlayAudio(AudioFile, Ct);
 		}
 	}
 
