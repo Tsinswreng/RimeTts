@@ -75,7 +75,7 @@ public sealed class FastLlmTranslator(
 			}
 
 			var json = await resp.Content.ReadAsStringAsync(cts.Token);
-			var yamlText = ExtractContent(json).Trim();
+			var yamlText = NormalizeYamlText(ExtractContent(json));
 			if(yamlText.Length == 0){
 				Log.LogError("translator response content empty. source={Source}; lang={Lang}; response={Response}", source, targetLang, SummarizeJson(json));
 				throw new InvalidOperationException("translator response content is empty");
@@ -263,6 +263,25 @@ public sealed class FastLlmTranslator(
 			return nestedContent.GetString() ?? "";
 		}
 		return "";
+	}
+
+	private static str NormalizeYamlText(str text){
+		var trimmed = text.Trim();
+		if(trimmed.Length == 0){
+			return "";
+		}
+
+		if(trimmed.StartsWith("```", StringComparison.Ordinal)){
+			var firstNl = trimmed.IndexOf('\n');
+			if(firstNl >= 0){
+				trimmed = trimmed[(firstNl + 1)..].Trim();
+			}
+			if(trimmed.EndsWith("```", StringComparison.Ordinal)){
+				trimmed = trimmed[..^3].Trim();
+			}
+		}
+
+		return trimmed;
 	}
 
 	private static str SummarizeJson(str json){
