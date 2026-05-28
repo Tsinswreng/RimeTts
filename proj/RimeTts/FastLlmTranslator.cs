@@ -37,7 +37,7 @@ public sealed class FastLlmTranslator(
 		lock(_lock){
 			if(_cache.TryGetValue(cacheKey, out var cached)){
 				if(!string.IsNullOrWhiteSpace(cached)){
-					Log.LogTranslationCacheText(cached);
+					Log.LogTranslationCacheText(targetLang, cached);
 				}
 				return new RespTranslate{ SourceText = source, TargetLanguage = targetLang, TranslatedText = cached };
 			}

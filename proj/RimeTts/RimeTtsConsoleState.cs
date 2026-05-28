@@ -23,11 +23,11 @@ public static class RimeTtsLogExt{
 		logger.LogRimeText(LogLevel.Information, "[成句]", text, ConsoleColor.Yellow);
 	}
 
-	public static void LogTranslationText(this ILogger logger, string text){
-		logger.LogRimeText(LogLevel.Information, "[AI翻譯]", text, ConsoleColor.Green);
+	public static void LogTranslationText(this ILogger logger, string lang, string text){
+		logger.LogRimeText(LogLevel.Information, $"[{lang}]", text, ConsoleColor.Green);
 	}
 
-	public static void LogTranslationCacheText(this ILogger logger, string text){
-		logger.LogRimeText(LogLevel.Information, "[AI翻譯][Cache]", text, ConsoleColor.Green);
+	public static void LogTranslationCacheText(this ILogger logger, string lang, string text){
+		logger.LogRimeText(LogLevel.Information, $"[{lang}][Cache]", text, ConsoleColor.Green);
 	}
 }

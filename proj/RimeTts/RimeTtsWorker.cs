@@ -194,7 +194,7 @@ public sealed class RimeTtsWorker(
 				Log.LogWarning("translation empty or null; skip speak. source={Source}; lang={Lang}", source, lang);
 				return null;
 			}
-			Log.LogTranslationText(target);
+			Log.LogTranslationText(lang, target);
 			return target;
 		}
 		catch(OperationCanceledException){
