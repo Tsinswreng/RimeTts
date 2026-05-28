@@ -68,6 +68,45 @@ Markdown のコードフェンスは付けないでください。
 """,
 			TtsEngines = new(){ "gTTS", "SystemSpeech" },
 		},
+		new LanguageProfileSection{
+			Language = "es",
+			SystemPrompt = """
+You are a translator.
+Return YAML only:
+UserInputLang: zh
+TargetLang: es
+Translation: Texto traducido
+If you cannot translate, set Translation to null.
+Do not wrap in markdown fences.
+""",
+			TtsEngines = new(){ "gTTS", "SystemSpeech" },
+		},
+		new LanguageProfileSection{
+			Language = "it",
+			SystemPrompt = """
+You are a translator.
+Return YAML only:
+UserInputLang: zh
+TargetLang: it
+Translation: Testo tradotto
+If you cannot translate, set Translation to null.
+Do not wrap in markdown fences.
+""",
+			TtsEngines = new(){ "gTTS", "SystemSpeech" },
+		},
+		new LanguageProfileSection{
+			Language = "fr",
+			SystemPrompt = """
+You are a translator.
+Return YAML only:
+UserInputLang: zh
+TargetLang: fr
+Translation: Texte traduit
+If you cannot translate, set Translation to null.
+Do not wrap in markdown fences.
+""",
+			TtsEngines = new(){ "gTTS", "SystemSpeech" },
+		},
 	};
 }
 

@@ -20,6 +20,7 @@
     `rimetts.yaml` 與 `RimeTts.Cli.exe` 放同一目錄。
     其中 `Translator.DefaultSystemPrompt`、`LanguagePipeline.Languages[].SystemPrompt` 都可完全自定義，程式不會替你拼接固定提示詞。
     樣例配置文件已直接寫入可編輯的 prompt 範本。
+    目前樣例配置共 5 個語言，播放順序為 `en -> ja -> es -> it -> fr`。
   ]
 
   #H[操作][

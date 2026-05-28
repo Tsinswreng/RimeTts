@@ -84,7 +84,27 @@ public sealed class OptLanguagePipeline:IOptLanguagePipeline{
 			Language = "en",
 			SystemPrompt = "",
 			TtsEngines = new(){ "gTTS", "SystemSpeech" },
-		}
+		},
+		new LanguageProfile{
+			Language = "ja",
+			SystemPrompt = "",
+			TtsEngines = new(){ "gTTS", "SystemSpeech" },
+		},
+		new LanguageProfile{
+			Language = "es",
+			SystemPrompt = "",
+			TtsEngines = new(){ "gTTS", "SystemSpeech" },
+		},
+		new LanguageProfile{
+			Language = "it",
+			SystemPrompt = "",
+			TtsEngines = new(){ "gTTS", "SystemSpeech" },
+		},
+		new LanguageProfile{
+			Language = "fr",
+			SystemPrompt = "",
+			TtsEngines = new(){ "gTTS", "SystemSpeech" },
+		},
 	};
 }
 

@@ -94,6 +94,36 @@ LanguagePipeline:
 			  翻訳できない場合は Translation を null にしてください。
 			  Markdown のコードフェンスは付けないでください。
 			TtsEngines: ["gTTS", "SystemSpeech"]
+		- Language: "es"
+			SystemPrompt: |
+			  You are a translator.
+			  Return YAML only:
+			  UserInputLang: zh
+			  TargetLang: es
+			  Translation: Texto traducido
+			  If you cannot translate, set Translation to null.
+			  Do not wrap in markdown fences.
+			TtsEngines: ["gTTS", "SystemSpeech"]
+		- Language: "it"
+			SystemPrompt: |
+			  You are a translator.
+			  Return YAML only:
+			  UserInputLang: zh
+			  TargetLang: it
+			  Translation: Testo tradotto
+			  If you cannot translate, set Translation to null.
+			  Do not wrap in markdown fences.
+			TtsEngines: ["gTTS", "SystemSpeech"]
+		- Language: "fr"
+			SystemPrompt: |
+			  You are a translator.
+			  Return YAML only:
+			  UserInputLang: zh
+			  TargetLang: fr
+			  Translation: Texte traduit
+			  If you cannot translate, set Translation to null.
+			  Do not wrap in markdown fences.
+			TtsEngines: ["gTTS", "SystemSpeech"]
 """;
 	}
 }

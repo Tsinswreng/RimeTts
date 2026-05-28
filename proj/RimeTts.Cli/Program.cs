@@ -80,7 +80,67 @@ builder.Services.AddRimeTts(
 			opt.Languages = new List<ILanguageProfile>{
 				new LanguageProfile{
 					Language = "en",
-					SystemPrompt = "You are a fast translator. Translate to concise natural English. Return YAML only with keys UserInputLang, TargetLang, Translation. UserInputLang and TargetLang must be BCP-47 language tags. TargetLang must be en. If you cannot translate, set Translation to null. Do not wrap the YAML in markdown fences.",
+					SystemPrompt = """
+You are a translator.
+Return YAML only:
+UserInputLang: zh
+TargetLang: en
+Translation: Translated Text
+If you cannot translate, set Translation to null.
+Do not wrap in markdown fences.
+""",
+					TtsEngines = new(){ "gTTS", "SystemSpeech" },
+				},
+				new LanguageProfile{
+					Language = "ja",
+					SystemPrompt = """
+あなたは翻訳者です。
+YAML のみを返してください:
+UserInputLang: zh
+TargetLang: ja
+Translation: 翻訳文
+翻訳できない場合は Translation を null にしてください。
+Markdown のコードフェンスは付けないでください。
+""",
+					TtsEngines = new(){ "gTTS", "SystemSpeech" },
+				},
+				new LanguageProfile{
+					Language = "es",
+					SystemPrompt = """
+You are a translator.
+Return YAML only:
+UserInputLang: zh
+TargetLang: es
+Translation: Texto traducido
+If you cannot translate, set Translation to null.
+Do not wrap in markdown fences.
+""",
+					TtsEngines = new(){ "gTTS", "SystemSpeech" },
+				},
+				new LanguageProfile{
+					Language = "it",
+					SystemPrompt = """
+You are a translator.
+Return YAML only:
+UserInputLang: zh
+TargetLang: it
+Translation: Testo tradotto
+If you cannot translate, set Translation to null.
+Do not wrap in markdown fences.
+""",
+					TtsEngines = new(){ "gTTS", "SystemSpeech" },
+				},
+				new LanguageProfile{
+					Language = "fr",
+					SystemPrompt = """
+You are a translator.
+Return YAML only:
+UserInputLang: zh
+TargetLang: fr
+Translation: Texte traduit
+If you cannot translate, set Translation to null.
+Do not wrap in markdown fences.
+""",
 					TtsEngines = new(){ "gTTS", "SystemSpeech" },
 				}
 			};
