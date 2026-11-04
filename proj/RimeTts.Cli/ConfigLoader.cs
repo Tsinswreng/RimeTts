@@ -50,9 +50,9 @@ Translator:
   # LLM API Key
 	ApiKey: ""
   # API 地址（兼容 OpenAI 协议的接口均可）
-	BaseUrl: "https://api.openai.com/v1/chat/completions"
-  # 模型名（推荐使用响应速度快的，如 gpt-4o-mini）
-	Model: "gpt-4o-mini"
+	BaseUrl: "https://api.deepseek.com/chat/completions"
+  # 模型名（推荐使用响应速度快的）
+	Model: "deepseek-v4-flash"
   # 请求超时秒数
 	TimeoutSec: 20
   # 默认翻译系统提示词（当语言条目未显式设置时使用）

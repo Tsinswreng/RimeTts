@@ -57,8 +57,8 @@ public sealed class OptSentenceSeg:IOptSentenceSeg{
 
 public sealed class OptTranslator{
 	public str ApiKey{get;set;} = "";
-	public str BaseUrl{get;set;} = "https://api.openai.com/v1/chat/completions";
-	public str Model{get;set;} = "gpt-4o-mini";
+	public str BaseUrl{get;set;} = "https://api.deepseek.com/chat/completions";
+	public str Model{get;set;} = "deepseek-v4-flash";
 	public i32 TimeoutSec{get;set;} = 20;
 	public str DefaultSystemPrompt{get;set;} = "You are a fast translator. Return YAML only with keys UserInputLang, TargetLang, Translation. UserInputLang and TargetLang must be BCP-47 language tags. If you cannot translate, set Translation to null. Do not wrap the YAML in markdown fences.";
 }
