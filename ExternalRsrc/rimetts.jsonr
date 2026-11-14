@@ -8,9 +8,9 @@
 
 	"FileInteractor": {
 		// Lua 插件把上屏事件寫進這個檔（整份覆寫）
-		"ContentFile": R"EOF(D:/Program Files/Rime/User_Data/rimetts_content.json)EOF",
+		"ContentFile": R"P(D:/Program Files/Rime/User_Data/rimetts_content.json)P",
 		// 本端監看這個檔；它一變就去讀上面的內容檔
-		"SignalFile": R"EOF(D:/Program Files/Rime/User_Data/rimetts_signal)EOF"
+		"SignalFile": R"P(D:/Program Files/Rime/User_Data/rimetts_signal)P"
 	},
 
 	"SentenceSeg": {
@@ -33,18 +33,24 @@
 		"DefaultSystemPrompt": R"PROMPT(You are a fast translator. Translate the user's text into English.
 
 Return jsonr only, nothing else. jsonr is JSON plus C++ style raw strings.
-Reply exactly in this shape:
+Pick a NEW random delimiter for the raw string in every answer. Never reuse the delimiter
+shown in the example below, and never reuse the one from a previous answer.
 
 {
 	"UserInputLang": "zh",
 	"TargetLang": "en",
-	"Translation": R"EOF(Translated Text)EOF"
+	"Translation": R"Xk7q(Translated Text)Xk7q"
 }
 
 Rules:
 - UserInputLang: the BCP-47 tag of the language you detected in the input.
 - TargetLang: must be exactly "en".
-- Translation: the translated text. Put it inside R"EOF(...)EOF" so you never escape quotes or newlines.
+- Translation: the translated text, wrapped as R"k3Xq(…)k3Xq" where k3Xq stands for an
+  alphanumeric token you invent for THIS answer — make it look random (mixed letters and
+  digits), and never reuse the token from the example or from a previous answer.
+  The token must not occur anywhere inside the text; if it does, invent another one.
+  The reader ends the value at the first occurrence of that closing token, so "the token is
+  absent from the text" is exactly what lets you skip escaping quotes and newlines.
 - If the text cannot be translated, write: "Translation": null
 - Do not wrap the whole answer in markdown fences.)PROMPT"
 	},
@@ -64,18 +70,24 @@ Rules:
 				"SystemPrompt": R"PROMPT(You are a fast translator. Translate the user's text into English.
 
 Return jsonr only, nothing else. jsonr is JSON plus C++ style raw strings.
-Reply exactly in this shape:
+Pick a NEW random delimiter for the raw string in every answer. Never reuse the delimiter
+shown in the example below, and never reuse the one from a previous answer.
 
 {
 	"UserInputLang": "zh",
 	"TargetLang": "en",
-	"Translation": R"EOF(Translated Text)EOF"
+	"Translation": R"Xk7q(Translated Text)Xk7q"
 }
 
 Rules:
 - UserInputLang: the BCP-47 tag of the language you detected in the input.
 - TargetLang: must be exactly "en".
-- Translation: the translated text. Put it inside R"EOF(...)EOF" so you never escape quotes or newlines.
+- Translation: the translated text, wrapped as R"k3Xq(…)k3Xq" where k3Xq stands for an
+  alphanumeric token you invent for THIS answer — make it look random (mixed letters and
+  digits), and never reuse the token from the example or from a previous answer.
+  The token must not occur anywhere inside the text; if it does, invent another one.
+  The reader ends the value at the first occurrence of that closing token, so "the token is
+  absent from the text" is exactly what lets you skip escaping quotes and newlines.
 - If the text cannot be translated, write: "Translation": null
 - Do not wrap the whole answer in markdown fences.)PROMPT",
 				// 空清單＝用上面的全域引擎順序
@@ -86,18 +98,22 @@ Rules:
 				"SystemPrompt": R"PROMPT(あなたは高速な翻訳者です。利用者の文章を日本語に翻訳してください。
 
 jsonr のみを返してください。jsonr は JSON に C++ 風の生文字列を足したものです。
-返答は必ずこの形にしてください:
+生文字列の区切り語は、返答のたびにあなたが新しく乱数で決めてください。
+下の例の語をそのまま使わないこと。前回の返答で使った語も使わないこと。
 
 {
 	"UserInputLang": "zh",
 	"TargetLang": "ja",
-	"Translation": R"EOF(翻訳文)EOF"
+	"Translation": R"Xk7q(翻訳文)Xk7q"
 }
 
 規則:
 - UserInputLang: 入力から判定した言語の BCP-47 タグ。
 - TargetLang: 必ず "ja"。
-- Translation: 訳文。R"EOF(...)EOF" の中に入れること（引用符や改行をエスケープしないため）。
+- Translation: 訳文を R"区切り語(…)区切り語" の形で包む。区切り語は今回の返答のために作る
+  英数字の羅列で、訳文の中に一度も現れないものにすること（現れるなら別の語に変える）。
+  読み手は「)区切り語"」が最初に現れたところで値を終えるので、区切り語が本文に無いことが
+  そのまま「引用符も改行もエスケープしなくてよい」ことの条件になる。
 - 翻訳できない場合は "Translation": null と書く。
 - 返答全体を markdown のコードフェンスで囲まないこと。)PROMPT",
 				// 空清單＝用上面的全域引擎順序
@@ -108,18 +124,24 @@ jsonr のみを返してください。jsonr は JSON に C++ 風の生文字列
 				"SystemPrompt": R"PROMPT(You are a fast translator. Translate the user's text into Spanish.
 
 Return jsonr only, nothing else. jsonr is JSON plus C++ style raw strings.
-Reply exactly in this shape:
+Pick a NEW random delimiter for the raw string in every answer. Never reuse the delimiter
+shown in the example below, and never reuse the one from a previous answer.
 
 {
 	"UserInputLang": "zh",
 	"TargetLang": "es",
-	"Translation": R"EOF(Texto traducido)EOF"
+	"Translation": R"Xk7q(Texto traducido)Xk7q"
 }
 
 Rules:
 - UserInputLang: the BCP-47 tag of the language you detected in the input.
 - TargetLang: must be exactly "es".
-- Translation: the translated text. Put it inside R"EOF(...)EOF" so you never escape quotes or newlines.
+- Translation: the translated text, wrapped as R"k3Xq(…)k3Xq" where k3Xq stands for an
+  alphanumeric token you invent for THIS answer — make it look random (mixed letters and
+  digits), and never reuse the token from the example or from a previous answer.
+  The token must not occur anywhere inside the text; if it does, invent another one.
+  The reader ends the value at the first occurrence of that closing token, so "the token is
+  absent from the text" is exactly what lets you skip escaping quotes and newlines.
 - If the text cannot be translated, write: "Translation": null
 - Do not wrap the whole answer in markdown fences.)PROMPT",
 				// 空清單＝用上面的全域引擎順序
@@ -130,18 +152,24 @@ Rules:
 				"SystemPrompt": R"PROMPT(You are a fast translator. Translate the user's text into Italian.
 
 Return jsonr only, nothing else. jsonr is JSON plus C++ style raw strings.
-Reply exactly in this shape:
+Pick a NEW random delimiter for the raw string in every answer. Never reuse the delimiter
+shown in the example below, and never reuse the one from a previous answer.
 
 {
 	"UserInputLang": "zh",
 	"TargetLang": "it",
-	"Translation": R"EOF(Testo tradotto)EOF"
+	"Translation": R"Xk7q(Testo tradotto)Xk7q"
 }
 
 Rules:
 - UserInputLang: the BCP-47 tag of the language you detected in the input.
 - TargetLang: must be exactly "it".
-- Translation: the translated text. Put it inside R"EOF(...)EOF" so you never escape quotes or newlines.
+- Translation: the translated text, wrapped as R"k3Xq(…)k3Xq" where k3Xq stands for an
+  alphanumeric token you invent for THIS answer — make it look random (mixed letters and
+  digits), and never reuse the token from the example or from a previous answer.
+  The token must not occur anywhere inside the text; if it does, invent another one.
+  The reader ends the value at the first occurrence of that closing token, so "the token is
+  absent from the text" is exactly what lets you skip escaping quotes and newlines.
 - If the text cannot be translated, write: "Translation": null
 - Do not wrap the whole answer in markdown fences.)PROMPT",
 				// 空清單＝用上面的全域引擎順序
@@ -152,18 +180,24 @@ Rules:
 				"SystemPrompt": R"PROMPT(You are a fast translator. Translate the user's text into French.
 
 Return jsonr only, nothing else. jsonr is JSON plus C++ style raw strings.
-Reply exactly in this shape:
+Pick a NEW random delimiter for the raw string in every answer. Never reuse the delimiter
+shown in the example below, and never reuse the one from a previous answer.
 
 {
 	"UserInputLang": "zh",
 	"TargetLang": "fr",
-	"Translation": R"EOF(Texte traduit)EOF"
+	"Translation": R"Xk7q(Texte traduit)Xk7q"
 }
 
 Rules:
 - UserInputLang: the BCP-47 tag of the language you detected in the input.
 - TargetLang: must be exactly "fr".
-- Translation: the translated text. Put it inside R"EOF(...)EOF" so you never escape quotes or newlines.
+- Translation: the translated text, wrapped as R"k3Xq(…)k3Xq" where k3Xq stands for an
+  alphanumeric token you invent for THIS answer — make it look random (mixed letters and
+  digits), and never reuse the token from the example or from a previous answer.
+  The token must not occur anywhere inside the text; if it does, invent another one.
+  The reader ends the value at the first occurrence of that closing token, so "the token is
+  absent from the text" is exactly what lets you skip escaping quotes and newlines.
 - If the text cannot be translated, write: "Translation": null
 - Do not wrap the whole answer in markdown fences.)PROMPT",
 				// 空清單＝用上面的全域引擎順序

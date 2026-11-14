@@ -56,9 +56,9 @@ public static class CfgSample{
 
 	"FileInteractor": {
 		// Lua 插件把上屏事件寫進這個檔（整份覆寫）
-		"ContentFile": R"EOF(D:/Program Files/Rime/User_Data/rimetts_content.json)EOF",
+		"ContentFile": R"P(D:/Program Files/Rime/User_Data/rimetts_content.json)P",
 		// 本端監看這個檔；它一變就去讀上面的內容檔
-		"SignalFile": R"EOF(D:/Program Files/Rime/User_Data/rimetts_signal)EOF"
+		"SignalFile": R"P(D:/Program Files/Rime/User_Data/rimetts_signal)P"
 	},
 
 	"SentenceSeg": {

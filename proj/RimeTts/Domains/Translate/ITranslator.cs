@@ -69,10 +69,13 @@ LLM 回應內容的形狀——**我們自己用提示詞規定的格式**。
 	{
 		"UserInputLang": "zh",
 		"TargetLang": "en",
-		"Translation": R"EOF(Translated Text)EOF"
+		"Translation": R"q7Zx(Translated Text)q7Zx"
 	}
 	```
-]
+
+*定界詞是模型每次自己造的*（理由見 {{nameof(LlmPrompts)}}）：生字串在遇到
+`)定界詞"` 時收尾，故定界詞若寫死，譯文裡出現同一個字串就會被提前截斷。
+本類只承接解析結果，不檢查定界詞——那是提示詞的責任。
 """)]
 public class ResLlm : IAppSerializable{
 

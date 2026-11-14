@@ -7,6 +7,24 @@
 		<RootNamespace>RimeTts.Cli</RootNamespace>
 	</PropertyGroup>
 
+	<!-- NativeAOT 發布（RimeTts.Scripts 的 PubWinAot）用的開關。
+		 *為何要一個開關*：全域 `PublishAot=true`（寫在 ../Directory.Build.props 的理由）在本專案
+		 預設關閉——它的兩條腿是 Windows 原生互操作。真要發布成原生 exe 時由這一段打開，
+		 而命令列傳的是 `-p:AotPub=true` 這個**只被本檔解讀**的屬性，
+		 不會像 `-p:PublishAot=true` 那樣傳染給被引用的 CsCore（它有一個 netstandard2.0 目標，
+		 那個目標不支援 AOT，會直接 NETSDK1207 失敗）。 -->
+	<PropertyGroup Condition="'$(AotPub)' == 'true'">
+		<PublishAot>true</PublishAot>
+		<PublishTrimmed>true</PublishTrimmed>
+		<TrimMode>link</TrimMode>
+		<!-- System.Speech 是 SAPI 的 COM 包裝：AOT 下要顯式開 COM 互操作支援，
+			 否則 `new SpeechSynthesizer()` 在執行期失敗（編譯期看不出來）。 -->
+		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+		<!-- *絕對不要開 InvariantGlobalization*：System.Speech 選音色要
+			 CultureInfo.GetCultureInfo("ja-JP")，invariant 模式下文化資料不存在。 -->
+		<InvariantGlobalization>false</InvariantGlobalization>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<ProjectReference Include="../RimeTts/RimeTts.csproj" />
 	</ItemGroup>

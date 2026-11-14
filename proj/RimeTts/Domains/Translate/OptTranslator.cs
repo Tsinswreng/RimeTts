@@ -46,24 +46,12 @@ public class OptTranslator{
 	""")]
 	public str DefaultSystemPrompt{get;set;} = DfltSystemPrompt;
 
-	[Doc("兜底提示詞的默認值。默認值的唯一出處就是這裡；配置檔沒寫時取它。")]
-	public const str DfltSystemPrompt = """
-You are a fast translator. Translate the user's text into English.
+	[Doc($$"""
+	兜底提示詞的默認值。
 
-Return jsonr only, nothing else. jsonr is JSON plus C++ style raw strings.
-Reply exactly in this shape:
-
-{
-	"UserInputLang": "zh",
-	"TargetLang": "en",
-	"Translation": R"EOF(Translated Text)EOF"
-}
-
-Rules:
-- UserInputLang: the BCP-47 tag of the language you detected in the input.
-- TargetLang: must be exactly "en".
-- Translation: the translated text. Put it inside R"EOF(...)EOF" so you never escape quotes or newlines.
-- If the text cannot be translated, write: "Translation": null
-- Do not wrap the whole answer in markdown fences.
-""";
+	*文字本身不在這裡*：格式規則（回 jsonr、隨機定界詞、翻不了寫 null）只有一份，
+	在 {{nameof(LlmPrompts.MkEn)}}；本欄位只是給鍵與選項一個穩定名字。
+	*為何是 `static readonly` 而不是 `const`*：它由方法產生，而 `const` 只能是編譯期常量。
+	""")]
+	public static readonly str DfltSystemPrompt = LlmPrompts.MkEn();
 }

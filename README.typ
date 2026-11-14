@@ -37,7 +37,7 @@
 				"Language": "en",
 				"SystemPrompt": R"PROMPT(You are a fast translator.
 
-Return jsonr only. Use R"EOF(...)EOF" for the translation.)PROMPT",
+Return jsonr only. Pick a random delimiter for the raw string in every answer.)PROMPT",
 				"TtsEngines": []
 			}
 		]
@@ -65,7 +65,7 @@ Return jsonr only. Use R"EOF(...)EOF" for the translation.)PROMPT",
 	{
 		"UserInputLang": "zh",
 		"TargetLang": "en",
-		"Translation": R"EOF(Translated Text)EOF"
+		"Translation": R"q7Zx(Translated Text)q7Zx"
 	}
 	```
 
@@ -73,11 +73,21 @@ Return jsonr only. Use R"EOF(...)EOF" for the translation.)PROMPT",
 	+ `Translation` 為 `null` 表示「翻不了」，同樣只跳過那個語言。
 	+ 模型自己加的 markdown 圍欄會被剝掉；回一堆廢話則解析失敗，記日誌、不朗讀。
 
-	*為何要生字串*：譯文裡常有引號與換行。用 `R"EOF(…)EOF"` 包起來，
+	*為何要生字串*：譯文裡常有引號與換行。用 `R"詞(…)詞"` 包起來，
 	模型不必轉義、我們也不必在解析時還原轉義，兩邊都少一類錯誤。
+
+	*定界詞必須每次由模型自己造*：生字串的結束條件是「遇到 `)詞"`」，
+	所以定界詞若寫死（例如大家都愛用的 `EOF`），譯文裡只要出現 `)EOF"`——
+	翻的是一段程式碼、或原文本身就含這種字串——解析會在那裡**提前收尾**，
+	剩下的內容全變成垃圾，這個語言直接翻不出來。
+	故出廠提示詞明確要求：每次回覆新造一個英數字定界詞、不得重用範例或前一次的詞、
+	且該詞不得出現在譯文裡。範例給的是 `q7Zx` 這種顯然是隨機的詞，
+	免得模型照抄一個「看起來像固定用法」的 `EOF`。
 
 	提示詞本身可以直接改（`Translator.DefaultSystemPrompt` 與每個語言條目的
 	`SystemPrompt`）。程式不會替你拼接任何固定提示詞——那幾段文字就是完整的系統提示詞。
+	出廠的六份提示詞集中在 `proj/RimeTts/Domains/Translate/LlmPrompts.cs`（英文規則與日文規則各一份），
+	改格式規則只改那一處。
 ]
 
 #H[操作][
@@ -95,7 +105,7 @@ Return jsonr only. Use R"EOF(...)EOF" for the translation.)PROMPT",
 	`Domains/` 是業務功能（`Typing`／`Seg`／`Translate`／`Tts`／`Pipeline`）。
 	+ `proj/RimeTts.Cli`：宿主。只做「建容器、跑流水線」；裝配在 `DiCli`。
 	+ `proj/RimeTts.Test`：樹型測試（CsTreeTest）。
-	+ `proj/RimeTts.Scripts`：維護腳本（`Test`／`TestAotWin`／`GenAppJsonCtx`）。
+	+ `proj/RimeTts.Scripts`：維護腳本（`Test`／`TestAotWin`／`GenAppJsonCtx`／`PubWinAot`）。
 
 	目錄判據照 `TswgCsTpl_App`：業務功能進 `Domains/`、程序集地基進 `Infra/`、
 	要免 using 的符號放根命名空間。
@@ -109,24 +119,40 @@ Return jsonr only. Use R"EOF(...)EOF" for the translation.)PROMPT",
 	dotnet run --project proj/RimeTts.Scripts -- Test
 	dotnet run --project proj/RimeTts.Scripts -- TestAotWin
 	dotnet run --project proj/RimeTts.Scripts -- GenAppJsonCtx
+	dotnet run --project proj/RimeTts.Scripts -- PubWinAot
 	```
 
 	+ `GenAppJsonCtx`：改了「要以型別往返的 DTO」之後跑一次，它會重寫
 	`proj/RimeTts/Tsinswreng.SrcGen/RimeTts.Gen.g.cs`。生成物要入庫。
 	+ `TestAotWin`：以 NativeAOT 發布測試專案再跑一次，用來檢查有沒有偷偷依賴反射式序列化。
-	2026-11-14 實測：發布成功，發布物上 30 個用例全過（唯一警告是測試自己用反射列舉鍵，
+	2026-11-14 實測：發布成功，發布物上 34 個用例全過（唯一警告是測試自己用反射列舉鍵，
 	那屬測試專屬、可接受）。
-	*本專案的 AOT 狀態*：業務程序集與測試都通過 AOT 發布；宿主沒有開啟 AOT，
-	因為它的兩條腿（NAudio、System.Speech）都是 Windows 原生互操作，未經驗證。
-	`PublishAot` 只寫在 `RimeTts.Test.csproj` 的條件區塊、由 `-p:AotTest=true` 開啟：
-	用全域 `-p:PublishAot=true` 會傳染給被引用的 CsCore，而它有一個 netstandard2.0 目標，
-	那個目標不支援 AOT（NETSDK1207）。
+	+ `PubWinAot`：發布**要交出去的那一份**——`dist/win-x64/` 的自包含目錄（實測 43 MiB），
+	目標機器不必裝 .NET。選項：`-Out <目錄>`、`-NoAot`（逃生門：改發 framework-dependent）、
+	`-DryRun`（只印命令）。首次執行會在該目錄生成 `rimetts.jsonr`。
+
+	#H[AOT 的三個開關與一個坑][
+		`PublishAot` 一律由專案內的條件區塊打開、由各自的屬性名控制：
+		`-p:AotTest=true`（測試專案）、`-p:AotPub=true`（宿主）。**不要**用全域
+		`-p:PublishAot=true`——那是命令列全域屬性，會傳染給被引用的 CsCore，
+		而它有一個 netstandard2.0 目標，那個目標不支援 AOT，整個發布會在
+		`TargetFramework=netstandard2.0` 那裡以 NETSDK1207 失敗。
+
+		#H[已知限制：離線 SAPI 引擎在 AOT 版上很可能不可用][
+			宿主 AOT 發布時，ILC 明確報告 `System.Speech` 的三個 SAPI COM 包裝類
+			（`SpObjectTokenCategory`、`SpDataKey`、`SpObjectToken`）「建構子永遠拋：
+			Invalid IL or CLR metadata」——那是 COM 類型在 AOT 下沒有運行期生成的元資料所致。
+			線上那條腿（gTTS）不受影響，故 AOT 版仍可用；但「網絡斷了就退回本機語音」
+			這個保險在 AOT 版上不成立。要為 AOT 版調整引擎清單或加啟動時探測，尚未拍板。
+		]
+	]
 ]
 
 #H[已知限制][
 	+ Windows only：全域 Esc 鉤子、NAudio 播放、SAPI 合成都是 Windows 專屬。
 	非 Windows 上程式會直接拒絕啟動，而不是半殘地跑起來。
 	+ 沒有測試涵蓋真實音頻輸出與 LLM 往返：那兩件事要網絡、要音效卡，
-	故測試只涵蓋解析、映射、排程與換手邏輯（30 個用例）。
+	故測試只涵蓋解析、映射、排程與換手邏輯（34 個用例）。
 	+ 譯文快取只在記憶體裡，重啟即失；音頻快取在 `tts-output/`，依「語言＋文本」雜湊命名。
+	+ AOT 版的離線語音（SAPI）很可能不可用，見上面「AOT 的三個開關與一個坑」。
 ]

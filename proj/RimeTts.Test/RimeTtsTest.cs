@@ -41,6 +41,7 @@ public class RimeTtsTester : Tester{
 		this.AddTester<TestCfg>();
 		this.AddTester<TestSentenceBuffer>();
 		this.AddTester<TestLlmAnswer>();
+		this.AddTester<TestLlmPrompts>();
 		this.AddTester<TestFallbackTts>();
 		this.AddTester<TestAudioPlaylist>();
 	}

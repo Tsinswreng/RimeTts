@@ -21,6 +21,13 @@ public interface ISCtx{
 	決定建置／發布輸出目錄名（如 `net11.0-windows`）。升級 TFM 時此處要同步改。
 	""")]
 	public str Tfm{get;set;}
+
+	[Doc($$"""
+	命令名之後的其餘引數（不含命令名本身）。
+	*為何放在上下文裡*：各腳本自己解析自己的旗標，但「怎麼從命令行拿引數」只該有一處；
+	放進來之後，腳本不必知道 `Environment.GetCommandLineArgs` 的前兩項是什麼。
+	""")]
+	public IList<str> Args{get;set;}
 }
 
 [Doc($$"""
@@ -34,6 +41,9 @@ public class SCtx : ISCtx{
 
 	[Doc("目標框架；dispatcher 建立時覆蓋。")]
 	public str Tfm{get;set;} = "";
+
+	[Doc("命令名之後的其餘引數；dispatcher 建立時填入。")]
+	public IList<str> Args{get;set;} = [];
 }
 
 [Doc($$"""
@@ -55,6 +65,8 @@ internal static partial class Program{
 			RootDir = Root,
 			// 與 proj/Directory.Build.props 的 TargetFramework 同步。
 			Tfm = "net11.0-windows",
+			// 首個引數是命令名，其餘歸各腳本自己解析。
+			Args = Args.Length > 1 ? [.. Args[1..]] : [],
 		};
 
 		if(Args.Length == 0){
@@ -73,6 +85,9 @@ internal static partial class Program{
 			case nameof(GenAppJsonCtx):
 				await GenAppJsonCtx.Main(Ctx, Ct);
 				break;
+			case nameof(PubWinAot):
+				await PubWinAot.Main(Ctx, Ct);
+				break;
 			default:
 				throw new ArgumentException($"Unknown RimeTts script: {Args[0]}.", nameof(Args));
 		}
@@ -80,9 +95,10 @@ internal static partial class Program{
 
 	[Doc("列出可由 `dotnet run -- <entry>` 呼叫的腳本名稱。")]
 	static void PrintUsage(){
-		Console.Error.WriteLine("Usage: dotnet run --project proj/RimeTts.Scripts -- <entry>");
-		Console.Error.WriteLine("Entries: Test, TestAotWin, GenAppJsonCtx");
+		Console.Error.WriteLine("Usage: dotnet run --project proj/RimeTts.Scripts -- <entry> [options]");
+		Console.Error.WriteLine("Entries: Test, TestAotWin, GenAppJsonCtx, PubWinAot");
 		Console.Error.WriteLine("GenAppJsonCtx：改過 DTO 之後跑一次，重寫 Tsinswreng.SrcGen/RimeTts.Gen.g.cs。");
+		Console.Error.WriteLine("PubWinAot：發布 Windows 原生成品目錄；選項 -Out <dir>／-NoAot／-DryRun。");
 	}
 
 	[Doc("讓編譯器提供本源碼路徑，故腳本不依賴啟動時的當前目錄。")]
