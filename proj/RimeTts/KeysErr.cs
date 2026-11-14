@@ -97,6 +97,15 @@ public static class KeysErr {
 
 		[Doc("該語言在本機沒有可用的系統語音。佔位符填語言代碼。")]
 		public static K NoVoiceForLang__ = Mk(_R, [nameof(NoVoiceForLang__)]);
+
+		[Doc("本機的 SAPI 引擎不可用（NativeAOT 下它的 COM 包裝類建構子無效）。")]
+		public static K SapiUnavailable = MkSys(_R, [nameof(SapiUnavailable)]);
+
+		[Doc("MCI 打不開這個音頻檔（三種 open 寫法都失敗）。")]
+		public static K MciOpenFailed__ = MkSys(_R, [nameof(MciOpenFailed__)]);
+
+		[Doc("MCI 命令返回非 0。訊息裡帶命令與錯誤碼文本。")]
+		public static K MciCommandFailed__ = MkSys(_R, [nameof(MciCommandFailed__)]);
 	}
 
 	[Doc("全域中斷熱鍵（Esc）的錯誤。")]

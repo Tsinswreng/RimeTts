@@ -55,4 +55,17 @@ public interface ITtsEngine : ITts{
 
 	[Doc("配置裡指這個引擎用的名字（大小寫不敏感）。")]
 	public str Name{get;}
+
+	[Doc($$"""
+	本機上這個引擎現在能不能用。
+
+	*為何需要它*：有些引擎的可用性是**執行環境**決定的，不是配置決定的——
+	離線那條腿（SAPI）在 NativeAOT 下它的 COM 包裝類建構子無效，
+	每次呼叫都抛；若不先問一句，每個語言每一句都要白拋一次、日誌也會被灌滿。
+	{{nameof(FallbackTts)}} 直接把不可用的引擎從候選裡剔除。
+
+	*契約*：這是一個便宜的查詢（結果快取在實現裡），可以在每次合成前呼叫；
+	回 false 之後不保證永遠 false（使用者可能剛裝了語音），故不寫成一次性結論。
+	""")]
+	public bool IsAvailable{get;}
 }

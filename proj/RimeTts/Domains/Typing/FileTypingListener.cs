@@ -44,8 +44,19 @@ public class FileTypingListener(
 	[Doc("上一次處理過的內容（原文），用於去重。")]
 	str LastPayload = "";
 
-	[Doc("上一次處理時信號檔的寫入時間（UTC），用於去重。")]
-	DateTime LastSignalWriteUtc = DateTime.MinValue;
+	[Doc("上一次真正派發事件的時刻，用於去重。")]
+	DateTimeOffset LastDispatchAt = DateTimeOffset.MinValue;
+
+	[Doc($$"""
+	同內容重複事件的最小間隔。
+
+	*為何不是「比信號檔的寫入時間」*：一次寫檔會觸發兩三個監看事件（Created ＋ Changed），
+	而每個事件各自去讀 `LastWriteTimeUtc`，讀到的值可能差一格（毫秒或檔案系統時間戳精度）——
+	於是同一份 payload 被派發兩次，使用者會聽到同一句唸兩遍（實測確實如此）。
+	故改用「同內容 ＋ 短時間窗」判定：同一次寫檔的事件都在幾毫秒內到齊，
+	而人類不可能在 300ms 內把同一句上屏兩次。
+	""")]
+	static readonly TimeSpan DuplicateWindow = TimeSpan.FromMilliseconds(300);
 
 	[Doc($$"""
 	接上監看器。
@@ -130,7 +141,7 @@ public class FileTypingListener(
 
 	[Doc($$"""
 	讀內容檔並分派事件。
-	#Prm[{{nameof(SignalWriteUtc)}}][這次通知對應的信號檔寫入時間，用於去重。]
+	#Prm[{{nameof(SignalWriteUtc)}}][這次通知對應的信號檔寫入時間；只寫進日誌，不參與去重（理由見 {{nameof(DuplicateWindow)}}）。]
 	""")]
 	async Task ReadAndDispatchAsync(DateTime SignalWriteUtc){
 		await ReadGate.WaitAsync();
@@ -142,10 +153,13 @@ public class FileTypingListener(
 					Opt.ContentFile, Opt.SignalFile);
 				return;
 			}
-			if(IsDuplicate(SignalWriteUtc, Json)){
+			if(IsDuplicate(Json)){
 				Log.LogDebug("duplicate payload ignored");
 				return;
 			}
+			// 信號時間只留作診斷：同一份內容被兩個事件讀到時，這裡會看到兩個不同的時間戳，
+			// 而去重已經由「內容 ＋ 時間窗」處理掉了，不靠它。
+			Log.LogDebug("dispatching payload. signalWriteUtc={SignalWriteUtc:O}", SignalWriteUtc);
 			Dispatch(Json);
 		}
 		catch(Exception Ex){
@@ -226,16 +240,19 @@ public class FileTypingListener(
 	}
 
 	[Doc($$"""
-	內容與信號時間都沒變才算重複。
-	*為何要一起比*：連續上屏同一個詞是正常操作（打錯重打），只看內容會把第二次吃掉。
+	同內容且在上次派發後的短時間內，才是重複。
+	*為何要時間窗*：連續上屏同一個詞是正常操作（打錯重打），只看內容會把第二次吃掉；
+	而一次寫檔的多個監看事件會落在同一瞬間，時間窗正好把它們收掉。
+	見 {{nameof(DuplicateWindow)}}。
 	""")]
-	bool IsDuplicate(DateTime SignalWriteUtc, str Json){
+	bool IsDuplicate(str Json){
 		lock(DedupeLock){
-			if(str.Equals(LastPayload, Json, StringComparison.Ordinal) && SignalWriteUtc == LastSignalWriteUtc){
+			var Now = DateTimeOffset.UtcNow;
+			if(str.Equals(LastPayload, Json, StringComparison.Ordinal) && Now - LastDispatchAt < DuplicateWindow){
 				return true;
 			}
 			LastPayload = Json;
-			LastSignalWriteUtc = SignalWriteUtc;
+			LastDispatchAt = Now;
 			return false;
 		}
 	}

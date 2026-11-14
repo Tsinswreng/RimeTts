@@ -15,8 +15,10 @@
 	`ContentFile`，然後改寫 `SignalFile`（時間戳或大小變了就行，內容無意義）。
 	+ 本端：`FileSystemWatcher` 監看 `SignalFile`；一有變動就去讀 `ContentFile`。
 	讀到的是半截 JSON 時會重試幾次——Lua 那邊不是原子寫入，這是協議的一部分。
-	+ 累積：上屏逐次追加到緩衝。上屏以終止符結尾，或距上次上屏超過
-	`SentenceSeg.NoCommitGapMs`，就把緩衝當成一句。
+	+ 累積：上屏逐次追加到緩衝。*距上次上屏超過 `SentenceSeg.NoCommitGapMs`（預設 5000ms）
+	就成句*——這是預設也是唯一的規則。
+	`SentenceTerminators` 是一個**預設關閉**的可選項：填了之後，「上屏以其中之一結尾」
+	會立刻成句、不等那 5 秒；留空則完全不看標點。
 	+ 翻譯：一句話同時送給所有配置的語言（並行），每個語言用自己的提示詞。
 	+ 合成：各語言的音頻也並行生成；生成失敗或超時只影響那一個語言。
 	+ 播放：嚴格依配置順序、一段播完才播下一段（音效卡是獨佔資源）。
@@ -127,9 +129,10 @@ Return jsonr only. Pick a random delimiter for the raw string in every answer.)P
 	+ `TestAotWin`：以 NativeAOT 發布測試專案再跑一次，用來檢查有沒有偷偷依賴反射式序列化。
 	2026-11-14 實測：發布成功，發布物上 34 個用例全過（唯一警告是測試自己用反射列舉鍵，
 	那屬測試專屬、可接受）。
-	+ `PubWinAot`：發布**要交出去的那一份**——`dist/win-x64/` 的自包含目錄（實測 43 MiB），
-	目標機器不必裝 .NET。選項：`-Out <目錄>`、`-NoAot`（逃生門：改發 framework-dependent）、
-	`-DryRun`（只印命令）。首次執行會在該目錄生成 `rimetts.jsonr`。
+	+ `PubWinAot`：AOT 發布宿主。**預設不另開目錄**，產物落在 SDK 標準位置
+	`proj/RimeTts.Cli/bin/Release/net11.0-windows/win-x64/publish/`（實測 43 MiB，目標機器不必裝 .NET）；
+	要帶去別處才用 `-Out <目錄>`。另有 `-NoAot`（改發 framework-dependent）、`-DryRun`（只印命令）。
+	首次執行會在 exe 同目錄生成 `rimetts.jsonr`。
 
 	#H[AOT 的三個開關與一個坑][
 		`PublishAot` 一律由專案內的條件區塊打開、由各自的屬性名控制：
@@ -138,12 +141,30 @@ Return jsonr only. Pick a random delimiter for the raw string in every answer.)P
 		而它有一個 netstandard2.0 目標，那個目標不支援 AOT，整個發布會在
 		`TargetFramework=netstandard2.0` 那裡以 NETSDK1207 失敗。
 
-		#H[已知限制：離線 SAPI 引擎在 AOT 版上很可能不可用][
+		#H[已知限制：離線 SAPI 引擎在 AOT 版上不可用][
 			宿主 AOT 發布時，ILC 明確報告 `System.Speech` 的三個 SAPI COM 包裝類
 			（`SpObjectTokenCategory`、`SpDataKey`、`SpObjectToken`）「建構子永遠拋：
 			Invalid IL or CLR metadata」——那是 COM 類型在 AOT 下沒有運行期生成的元資料所致。
-			線上那條腿（gTTS）不受影響，故 AOT 版仍可用；但「網絡斷了就退回本機語音」
-			這個保險在 AOT 版上不成立。要為 AOT 版調整引擎清單或加啟動時探測，尚未拍板。
+			故 `SystemSpeechTts` 會**探測一次**（真的 new 一個 `SpeechSynthesizer`），
+			失敗就把自己標成不可用並記一條警告，之後 `FallbackTts` 直接跳過它。
+			JIT 版（`dotnet run`）那條退路仍然有效；AOT 版等於只剩 gTTS。
+		]
+
+		#H[mp3 在 AOT 下怎麼播：三層退讓][
+			這一塊最容易踩，且症狀是「一點聲音都沒有、日誌只說 audio play failed」：
+
+			+ **Media Foundation**（`MediaFoundationReader`，也就是 `AudioFileReader` 對 mp3 的預設路徑）
+			在 AOT 下直接拋 `NotSupportedException: COM Interop requires ComWrapper instance
+			registered for marshalling`——NAudio 的 MF 互操作是手寫 `[ComImport]` 介面，
+			而 NativeAOT 已經不提供內建 COM 包裝（`BuiltInComInteropSupport` 在新版 SDK 上不再起作用）。
+			+ **ACM**（`Mp3FileReader`）純 P/Invoke，但實測在 AOT 下也失敗（JIT 下正常）。
+			+ **MCI**（`mciSendString`，`winmm.dll`）對 AOT 友好、實測可用，故它是最後一道。
+
+			結論：`AudioPlayer` 對 mp3 依序試 ACM → MF → MCI，任一成功就播；
+			MF 失敗一次就記住不再試（免得每段音頻都拋一次例外、日誌被灌滿）。
+			mp3 的時長同理走 ACM → MF → MCI 的 `status <alias> length`，
+			拿不到就退回 20 秒保底超時。
+			*wav 不受影響*：`WaveFileReader` 純托管，且 `WaveOutEvent` 只走 winmm P/Invoke。
 		]
 	]
 ]

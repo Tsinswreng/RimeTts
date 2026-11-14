@@ -9,8 +9,10 @@ internal static partial class PubWinAot{
 	[Doc("要發布的專案；相對於倉庫根。")]
 	const str CliCsprojRelPath = "proj/RimeTts.Cli/RimeTts.Cli.csproj";
 
-	[Doc("預設發布目錄；相對於倉庫根。`dist/` 在 .gitignore 裡。")]
-	const str DfltOutRelDir = "dist/win-x64";
+	[Doc(@"沒給 `-Out` 時的產物目錄：`dotnet publish` 的標準位置
+	（`bin/Release/<tfm>/win-x64/publish`）。*不自己另開目錄*——產物放在建置輸出裡，
+	要帶走的時候再由呼叫方用 `-Out` 指定。")]
+	const str DfltPublishRelPath = "proj/RimeTts.Cli/bin/Release/net11.0-windows/win-x64/publish";
 
 	[Doc("產物 exe 的檔名。")]
 	const str ExeName = "RimeTts.Cli.exe";
@@ -58,8 +60,12 @@ internal static partial class PubWinAot{
 			"publish", Csproj
 			,"-c", "Release"
 			,"-r", "win-x64"
-			,"-o", Opts.OutDir
 		};
+		// 只有呼叫方明確指定時才用 -o；預設就讓 SDK 放到它自己的 publish 目錄。
+		if(!str.IsNullOrWhiteSpace(Opts.OutDir)){
+			Args.Add("-o");
+			Args.Add(Opts.OutDir);
+		}
 		if(Opts.NoAot){
 			// 逃生門：AOT 因為原生工具鏈或某個套件而編不過時，至少還能產出一份可跑的目錄。
 			// 明確寫 false 而不是「不傳」——不傳會繼承 csproj 的條件，而那個條件由下面的屬性控制。
@@ -96,7 +102,7 @@ internal static partial class PubWinAot{
 	}
 
 	[Doc($$"""
-	把 `-Out` 解析成絕對路徑；沒給就用 `{{nameof(DfltOutRelDir)}}`。
+	把產物目錄解析成絕對路徑：有 `-Out` 就用它，否則用 SDK 的預設 publish 目錄。
 
 	*為何用 `Path.GetFullPath` 而不是 {{nameof(FullPath)}}*：`Pth` 的 `/` 拼接產生正斜線路徑，
 	後面又要用 `Path.Combine` 拼檔名；不先正規化的話，印出來會是 `a/b\c.exe` 這種混用的樣子。
@@ -104,7 +110,7 @@ internal static partial class PubWinAot{
 	""")]
 	static str ResolveOutDir(ISCtx Ctx, OptPub Opts){
 		var Raw = str.IsNullOrWhiteSpace(Opts.OutDir)
-			? System.IO.Path.Combine(Ctx.RootDir.ToString(), DfltOutRelDir)
+			? System.IO.Path.Combine(Ctx.RootDir.ToString(), DfltPublishRelPath)
 			: Opts.OutDir;
 		return System.IO.Path.GetFullPath(Raw);
 	}

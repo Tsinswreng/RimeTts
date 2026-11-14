@@ -12,6 +12,20 @@ public partial class TestCfg{
 		this.AddTestCase(nameof(Sample_Parses), Sample_Parses!);
 		this.AddTestCase(nameof(Sample_CoversAllKeys), Sample_CoversAllKeys!);
 		this.AddTestCase(nameof(Sample_MatchesDefaultLanguages), Sample_MatchesDefaultLanguages!);
+		this.AddTestCase(nameof(Sample_KeepsGapOnlySegmentation), Sample_KeepsGapOnlySegmentation!);
+	}
+
+	public partial async Task<nil> Sample_KeepsGapOnlySegmentation(obj? O){
+		var T = Assert.IsTrue;
+		var Cfg = RimeTts.Infra.Json.JsonrCfg.FromText(CfgSample.MkDefaultText(), "sample");
+		var Opt = CfgMapper.MkSentenceSeg(Cfg);
+
+		// 使用者要的成句規則就是「5 秒無上屏」。終止符清單雖然是可配置項，
+		// 但樣例裡一旦填了值，開箱即變成「打句號就唸」——那是擅自改行為。
+		T(Opt.SentenceTerminators.Count == 0,
+			$"樣例的 SentenceTerminators 必須留空（只按間隔成句），實際 {Opt.SentenceTerminators.Count} 項");
+		T(Opt.NoCommitGapMs == 5000, $"樣例的斷句間隔應為 5000ms，實際 {Opt.NoCommitGapMs}");
+		return NIL;
 	}
 
 	public partial async Task<nil> Sample_Parses(obj? O){

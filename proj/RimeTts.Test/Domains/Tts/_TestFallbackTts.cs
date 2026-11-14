@@ -39,4 +39,7 @@ public partial class TestFallbackTts{
 
 	[Doc("配置裡寫了不認識的引擎名時跳過它，不讓整句失敗。")]
 	public partial Task<nil> IgnoresUnknownEngine(obj? O);
+
+	[Doc("環境層面不可用的引擎（例如 AOT 下的 SAPI）要被剔除，且根本不會被呼叫。")]
+	public partial Task<nil> SkipsUnavailableEngine(obj? O);
 }

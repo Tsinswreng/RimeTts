@@ -26,4 +26,7 @@ public partial class TestSentenceBuffer{
 
 	[Doc("空上屏與純空白被忽略，不影響累積。")]
 	public partial Task<nil> Append_IgnoresBlank(obj? O);
+
+	[Doc("未配置終止符時（預設情況），即使上屏帶句號也不成句——只按間隔斷句。")]
+	public partial Task<nil> Append_NoTerminatorsNeverFlushesOnPunctuation(obj? O);
 }

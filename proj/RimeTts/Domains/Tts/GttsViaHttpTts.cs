@@ -31,6 +31,13 @@ public class GttsViaHttpTts(
 	[Doc("配置裡指這個引擎用的名字。")]
 	public str Name => EngineName;
 
+	[Doc("純網絡引擎：只要行程活著、網絡能通就能用，故不需要探測。")]
+	public bool IsAvailable => true;
+
+	[Doc(@"端點。用 `translate.google.com` 而非 `translate.googleapis.com`：
+	後者對匿名瀏覽器式請求的寬容度較差，容易回 429（`Ngan.Dict` 的經驗）。")]
+	const str Endpoint = "https://translate.google.com/translate_tts";
+
 	[Doc("單次請求的文本上限（字元）。取 180 留一點餘量給 URL 編碼後的膨脹。")]
 	const i32 MaxChunkChars = 180;
 
@@ -86,11 +93,17 @@ public class GttsViaHttpTts(
 
 	[Doc("抓一片並追加寫入輸出流。")]
 	async Task AppendChunkAsync(str Chunk, str Lang, Stream OutFs, CT Ct){
-		var Url = "https://translate.googleapis.com/translate_tts"
+		var Url = Endpoint
 			+ $"?ie=UTF-8&client=tw-ob&tl={Uri.EscapeDataString(Lang)}&q={Uri.EscapeDataString(Chunk)}";
 		using var Req = new HttpRequestMessage(HttpMethod.Get, Url);
-		// 該端點對沒有 UA 的請求會回 403；這一行不是可選項。
-		Req.Headers.UserAgent.ParseAdd("Mozilla/5.0");
+		// 端點會按「像不像瀏覽器」決定要不要回 429；故補齊常見的瀏覽器請求頭。
+		// 只加 UA 不夠——Referer 與 Accept 缺失時它仍可能拒絕。
+		Req.Headers.UserAgent.ParseAdd(
+			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+		Req.Headers.Referrer = new Uri("https://translate.google.com/");
+		Req.Headers.Accept.ParseAdd("audio/mpeg,audio/*;q=0.9,*/*;q=0.8");
+		Req.Headers.AcceptLanguage.ParseAdd($"{Lang},en;q=0.9");
+		Req.Headers.TryAddWithoutValidation("Origin", "https://translate.google.com");
 		using var Resp = await Http.SendAsync(Req, HttpCompletionOption.ResponseHeadersRead, Ct);
 		Resp.EnsureSuccessStatusCode();
 		await using var In = await Resp.Content.ReadAsStreamAsync(Ct);

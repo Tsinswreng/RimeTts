@@ -31,12 +31,58 @@ public class SystemSpeechTts(
 	[Doc("配置裡指這個引擎用的名字。")]
 	public str Name => EngineName;
 
+	[Doc("探測結果的鎖；探測只做一次。")]
+	readonly Lock ProbeGate = new();
+
+	[Doc("null＝還沒探測過；true／false＝探測結果。")]
+	bool? Probed;
+
+	[Doc($$"""
+	本機上 SAPI 現在能不能用。
+
+	*為何要探測*：SAPI 是 COM。NativeAOT 下它的 COM 包裝類（`SpObjectTokenCategory` 等）
+	建構子無效（ILC 會明確報告），所以**同一份代碼在 JIT 下可用、在 AOT 下必定抛**。
+	不先問一句，每個語言每一句都要白抛一次、日誌被灌滿。故第一次詢問時真的建一個
+	{{nameof(SpeechSynthesizer)}} 試試，結果快取；失敗只記一條警告（含原因）。
+
+	*為何不直接把這個引擎刪掉*：JIT 版（日常用 `dotnet run`）仍需要「網絡斷了就讀本機語音」
+	這條退路。探測讓同一份代碼在兩種運行方式下都表現合理。
+	""")]
+	public bool IsAvailable{
+		get{
+			lock(ProbeGate){
+				if(Probed is null){
+					Probed = Probe();
+				}
+				return Probed.Value;
+			}
+		}
+	}
+
+	[Doc("真的建一次合成器；成功回 true，失敗記一條警告回 false。")]
+	bool Probe(){
+		try{
+			using var Synth = new SpeechSynthesizer();
+			_ = Synth.GetInstalledVoices().Count;
+			return true;
+		}
+		catch(Exception Ex){
+			// AOT 下典型是 TypeLoadException／InvalidProgramException 或 COM 註冊失敗。
+			Log.LogWarning(Ex, "system speech engine is unavailable in this runtime; it will be skipped");
+			return false;
+		}
+	}
+
 	[Doc($$"""
 	合成 wav 並回傳路徑；檔案已存在就不重合成。
 	#Prm[{{nameof(Req)}}][合成請求。]
 	#Rtn[wav 檔的絕對路徑。]
+	#Throw[{{nameof(TypedErr)}}][本機 SAPI 不可用（{{nameof(KeysErr.Tts.SapiUnavailable)}}）時。]
 	""")]
 	public async Task<str> GenerateAudio(ReqGenEtPlay Req, CT Ct){
+		if(!IsAvailable){
+			throw KeysErr.Tts.SapiUnavailable.ToErr();
+		}
 		var Text = Req.Text?.Trim() ?? "";
 		if(Text.Length == 0){
 			throw KeysErr.Common.ArgErr__.ToErr(nameof(Req.Text));

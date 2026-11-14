@@ -57,7 +57,9 @@ internal static partial class PubWinAot{
 """)]
 internal sealed partial class OptPub{
 
-	[Doc(@"發布目錄的絕對路徑；空串表示用預設位置（`<倉庫根>/dist/win-x64`）。")]
+	[Doc(@"產物目錄。空串＝不傳 `-o`，由 SDK 放到它自己的 publish 目錄
+	（`proj/RimeTts.Cli/bin/Release/net11.0-windows/win-x64/publish`）；
+	只有明確要帶去別處時才給這個參數。")]
 	public str OutDir{get;set;} = "";
 
 	[Doc("true 時走 framework-dependent（不編原生碼）：發布快、產物小，但目標機器要裝 .NET 11 runtime。")]

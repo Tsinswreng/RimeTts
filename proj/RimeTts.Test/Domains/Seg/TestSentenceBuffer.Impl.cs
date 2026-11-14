@@ -24,6 +24,7 @@ public partial class TestSentenceBuffer{
 		this.AddTestCase(nameof(Idle_FlushesOnlyAfterGap), Idle_FlushesOnlyAfterGap!);
 		this.AddTestCase(nameof(Flush_ClearsBuffer), Flush_ClearsBuffer!);
 		this.AddTestCase(nameof(Append_IgnoresBlank), Append_IgnoresBlank!);
+		this.AddTestCase(nameof(Append_NoTerminatorsNeverFlushesOnPunctuation), Append_NoTerminatorsNeverFlushesOnPunctuation!);
 	}
 
 	public partial async Task<nil> Append_TerminatorFlushes(obj? O){
@@ -94,6 +95,25 @@ public partial class TestSentenceBuffer{
 		T(Buffer.TryFlushByIdle() is null, "只有空白時不該成句");
 
 		T(Buffer.Append("好。") == "好。", "空白上屏不該污染累積內容");
+		return NIL;
+	}
+
+	public partial async Task<nil> Append_NoTerminatorsNeverFlushesOnPunctuation(obj? O){
+		var T = Assert.IsTrue;
+		// 這是預設配置的樣子：終止符清單是空的。
+		var Time = new Fakes.FakeTimeProvider();
+		var Opt = new OptSentenceSeg{
+			NoCommitGapMs = GapMs,
+			SentenceTerminators = new List<str>(),
+		};
+		var Buffer = new SentenceBuffer(Opt, Time);
+
+		T(Buffer.Append("你好。") is null, "沒配置終止符時，句號不該讓它成句");
+		T(Buffer.Append("再一句！") is null, "沒配置終止符時，驚嘆號也不該讓它成句");
+
+		Time.Advance(TimeSpan.FromMilliseconds(GapMs));
+		var Sentence = Buffer.TryFlushByIdle();
+		T(Sentence == "你好。再一句！", $"只該由間隔成句，實際「{Sentence}」");
 		return NIL;
 	}
 }

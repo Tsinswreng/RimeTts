@@ -16,6 +16,9 @@ public class FakeTtsEngine(str Name, bool Fail = false) : ITtsEngine{
 	[Doc("是否每次呼叫都失敗；測試用它在不同引擎之間造出成功／失敗的組合。")]
 	public bool Fail{get;set;} = Fail;
 
+	[Doc("本機上是否可用；測「環境不可用時被剔除」用。")]
+	public bool IsAvailable{get;set;} = true;
+
 	[Doc("被呼叫過幾次；用來斷言「前一個成功之後就不該再叫下一個」。")]
 	public i32 Calls{get;private set;}
 

@@ -27,6 +27,7 @@ public partial class TestFallbackTts{
 		this.AddTestCase(nameof(RequestEnginesOverrideGlobal), RequestEnginesOverrideGlobal!);
 		this.AddTestCase(nameof(ThrowsWhenAllFail), ThrowsWhenAllFail!);
 		this.AddTestCase(nameof(IgnoresUnknownEngine), IgnoresUnknownEngine!);
+		this.AddTestCase(nameof(SkipsUnavailableEngine), SkipsUnavailableEngine!);
 	}
 
 	public partial async Task<nil> UsesFirstSuccessfulEngine(obj? O){
@@ -96,6 +97,20 @@ public partial class TestFallbackTts{
 		var File = await Tts.GenerateAudio(MkReq(), default);
 
 		T(File == "b.en.mp3", $"不認識的引擎應被跳過，實際 {File}");
+		return NIL;
+	}
+
+	public partial async Task<nil> SkipsUnavailableEngine(obj? O){
+		var T = Assert.IsTrue;
+		// 第一個引擎「本機上不可用」（例如 AOT 下的 SAPI），第二個正常。
+		var Broken = new Fakes.FakeTtsEngine("a"){ IsAvailable = false };
+		var Real = new Fakes.FakeTtsEngine("b");
+		var Tts = Mk([Broken, Real], "a", "b");
+
+		var File = await Tts.GenerateAudio(MkReq(), default);
+
+		T(Broken.Calls == 0, $"不可用的引擎不該被呼叫，實際被叫 {Broken.Calls} 次");
+		T(File == "b.en.mp3", $"應直接由可用引擎產出，實際 {File}");
 		return NIL;
 	}
 }

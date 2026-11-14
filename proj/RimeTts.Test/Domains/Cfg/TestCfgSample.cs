@@ -22,4 +22,7 @@ public partial class TestCfg{
 
 	[Doc("用樣例映射出來的語言清單必須與出廠清單一致（順序、語言代碼、提示詞）。")]
 	public partial Task<nil> Sample_MatchesDefaultLanguages(obj? O);
+
+	[Doc("樣例的成句規則必須是「只按間隔」，不得偷偷打開按標點斷句。")]
+	public partial Task<nil> Sample_KeepsGapOnlySegmentation(obj? O);
 }

@@ -60,6 +60,12 @@ public class FallbackTts : ITts{
 				Log.LogWarning("unknown tts engine ignored: {Engine}", Name);
 				continue;
 			}
+			// 環境層面就不可用的引擎（例如 NativeAOT 下的 SAPI）直接剔除：
+			// 不問這一句就會每個語言每一句都白抛一次，日誌被灌滿。
+			if(!Engine.IsAvailable){
+				Log.LogDebug("tts engine unavailable in this runtime; skipped. engine={Engine}", Name);
+				continue;
+			}
 			try{
 				return await Engine.GenerateAudio(Req, Ct);
 			}
