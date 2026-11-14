@@ -20,7 +20,12 @@ global using obj = System.Object;
 global using nil = System.Object;
 global using CT = System.Threading.CancellationToken;
 
+// [Doc] 屬性與 Extn 等小工具來自 CsCore；錯誤鍵／TypedErr 來自 CsErr。
+// 這兩條全域 using 是「免 using 就能用」約定的落點：
+// 拋錯處只寫 KeysErr.Xxx.ToErr()，註解處只寫 [Doc]，不必每個檔案再補一行 using。
 #pragma warning disable CS0436
+global using Tsinswreng.CsCore;
+global using Tsinswreng.CsErr;
 global using static Tsinswreng.CsTypeAlias.Nil;
 namespace Tsinswreng.CsTypeAlias {
 	internal class Nil{

@@ -1,12 +1,29 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<RootNamespace>RimeTts.Test</RootNamespace>
+		<!-- 用例一律異步簽名（框架約定 `Task<nil>`），同步邏輯直接返回 NIL，
+			 故容忍「無 await 的異步方法」。 -->
+		<NoWarn>$(NoWarn);CS1998</NoWarn>
+	</PropertyGroup>
 
-  
+	<!-- AOT 驗證（RimeTts.Scripts 的 TestAotWin）用的開關。
+		 *為何要一個開關而不是直接寫 PublishAot=true*：開著它，日常 `dotnet run` 也會走
+		 AOT 的分析路徑，徒增時間；更重要的是「不要用命令列 -p:PublishAot=true」——
+		 那是全域屬性，會傳染給所有被引用的專案，其中 CsCore 還有一個 netstandard2.0 的
+		 目標框架，而 netstandard2.0 不支援 AOT，整個發布會在那裡失敗（NETSDK1207）。
+		 寫在專案裡就只影響本專案。 -->
+	<PropertyGroup Condition="'$(AotTest)' == 'true'">
+		<PublishAot>true</PublishAot>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- 測試框架走本地源：NuGet 上的 0.1.1-alpha 與本地 0.2.0-alpha 的 API 不相容。 -->
+		<ProjectReference Include="$(TswgLibsDir)CsTreeTest/proj/Tsinswreng.CsTreeTest/Tsinswreng.CsTreeTest.csproj" />
+
+		<!-- 業務程序集：測試類要經專案的 Di 取被測服務。 -->
+		<ProjectReference Include="../RimeTts/RimeTts.csproj" />
+	</ItemGroup>
 
 </Project>

@@ -1,16 +1,66 @@
 <Project>
+	<!-- 本檔是本專案所有專案的共同地基。寫在這裡的理由與 TswgCsTpl_App 相同：
+		 四個專案（RimeTts／Cli／Test／Scripts）的 TFM、本地庫引用、共通套件必須完全一致，
+		 寫在各 csproj 就會漂移。只有「只有那個專案才用」的東西才留在它自己的 csproj
+		 （例如 NAudio／System.Speech 只屬於 RimeTts 這個業務程序集）。
+
+		 本地庫路徑屬性 TswgLibsDir 定義在同目錄 TswgLibs.props，
+		 必須放在使用它的 ItemGroup 之前：MSBuild 逐行求值，導入晚了屬性就是空的。 -->
+	<Import Project="$(MSBuildThisFileDirectory)TswgLibs.props" />
+
 	<PropertyGroup>
-		<TargetFramework>net10.0</TargetFramework>
+		<!-- *為何是 net11.0-windows 而不是模板的 net11.0*：本工具的宿主不可能跑在非 Windows 上——
+			 上屏監聽靠 Rime 寫檔（可以跨平臺），但全域 Esc 鉤子是 Win32、
+			 播放器是 NAudio、離線 TTS 是 SAPI（System.Speech）。
+			 用 -windows 這個 TFM 才讓 NAudio 解析到它的 windows 資產、也才允許呼叫 Win32 API。
+			 TFM 升級時 RimeTts.Scripts/Program.cs 的 ISCtx.Tfm 要同步改（它用來拼發布輸出路徑）。 -->
+		<TargetFramework>net11.0-windows</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<PublishAot>true</PublishAot>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+		<!-- *全域不開 NativeAOT*：本專案要發佈的是命令列工具，它的 TTS 兩條腿
+			 （NAudio 的 WinMM/WASAPI、System.Speech 的 SAPI COM）都是 Windows 上的
+			 原生互操作，AOT 下能否工作未經驗證；先保持 JIT，AOT 由 RimeTts.Scripts 的
+			 TestAotWin 明確以 `-p:PublishAot=true` 單獨驗證，失敗也只是一個待辦，
+			 不會讓整個專案連編譯都編不了。 -->
+		<PublishAot>false</PublishAot>
+
+		<!-- *不要開 InvariantGlobalization*：System.Speech 選語音要用
+			 CultureInfo.GetCultureInfo("ja-JP") 這類具體文化，invariant 模式下文化資料不存在，
+			 選語音的整條路會失敗。 -->
 	</PropertyGroup>
+
 	<ItemGroup>
 		<Compile Include="../TypeAlias.cs" />
 	</ItemGroup>
+
+	<!-- 共通套件。版本一律寫在這裡，各 csproj 不得自行寫死版本號。 -->
 	<ItemGroup>
-		<PackageReference Include="pythonnet" Version="3.0.5" />
-		<PackageReference Include="System.Speech" Version="9.0.10" />
+		<!-- AppLog 的基類 DelegatingLogger（多態全局日誌）。 -->
+		<PackageReference Include="Tsinswreng.CsLog" Version="0.0.1-alpha" />
+
+		<!-- 依賴注入：本專案只用 ServiceCollection／ServiceProvider，不引入 Hosting
+			 （理由見 RimeTts.Cli/Program.cs：沒有需要 Hosting 管理的生命週期）。 -->
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
+	</ItemGroup>
+
+	<!-- ── 本地基礎庫 ──
+		 一律走本地專案引用而不是 NuGet：這些庫在工作區裡還在演進，
+		 NuGet 上的 alpha 版與本地 API 已經對不上（例如 CsCfg 的檔案源、CsJsonr 整個庫）。 -->
+	<ItemGroup>
+		<ProjectReference Include="$(TswgLibsDir)CsCore/proj/Tsinswreng.CsCore/Tsinswreng.CsCore.csproj" />
+		<ProjectReference Include="$(TswgLibsDir)CsTempus/proj/Tsinswreng.CsTempus/Tsinswreng.CsTempus.csproj" />
+		<ProjectReference Include="$(TswgLibsDir)CsKeyNode/proj/Tsinswreng.CsKeyNode/Tsinswreng.CsKeyNode.csproj" />
+		<ProjectReference Include="$(TswgLibsDir)CsErr/proj/Tsinswreng.CsErr/Tsinswreng.CsErr.csproj" />
+		<ProjectReference Include="$(TswgLibsDir)CsJson/proj/Tsinswreng.CsJson/Tsinswreng.CsJson.csproj" />
+		<!-- jsonr：在 JSON 基底上加註釋、heredoc 與 C++ raw string 的文本格式。
+			 配置檔與 LLM 回應都用它，故凡是讀寫配置或解析 LLM 回應的專案都需要它。 -->
+		<ProjectReference Include="$(TswgLibsDir)Jsonr/proj/Tsinswreng.CsJsonr/Tsinswreng.CsJsonr.csproj" />
+		<!-- 配置骨架（鍵、多源疊加、按路徑取值）與 jsonr 檔案源。
+			 核心不含任何格式知識，格式包只提供編解碼器，兩者必須成對引用。 -->
+		<ProjectReference Include="$(TswgLibsDir)CsCfg/proj/Tsinswreng.CsCfg/Tsinswreng.CsCfg.csproj" />
+		<ProjectReference Include="$(TswgLibsDir)CsCfg/proj/Tsinswreng.CsCfg.Json/Tsinswreng.CsCfg.Json.csproj" />
 	</ItemGroup>
 </Project>

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- 模板倉庫不含 CsSh 源碼，固定從 NuGet 引用（與 TswgCsTpl_App／Ngan.Ime 的做法一致）。
+		 本專案只是開發期工具，不是產品的一部分，故不入發布流程。 -->
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<RootNamespace>RimeTts.Scripts</RootNamespace>
+		<!-- 各具名腳本的 Main(...) 由 Program dispatcher 呼叫；只有 Program.Main 是 CLR entry point。 -->
+		<NoWarn>$(NoWarn);CS0028</NoWarn>
+		<!-- GenAppJsonCtx 用 Roslyn 的 MSBuildWorkspace 分析專案，那套東西依賴大量反射與動態代碼，
+			 根本無法 NativeAOT（與模板同款理由）。 -->
+		<PublishAot>false</PublishAot>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Tsinswreng.CsSh" Version="0.3.0-alpha" />
+		<!-- GenAppJsonCtx：以 Roslyn 載入 proj/RimeTts 專案，按語義分析收集標記接口的實現者。 -->
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.8.0" />
+		<PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.8.0" />
+		<PackageReference Include="Microsoft.Build.Locator" Version="1.6.10" />
+	</ItemGroup>
+
+	<!-- 本專案不需要業務程序集的任何型別：它只會「讀」那個專案，不引用它。
+		 引用反而會讓 Scripts 自己也拖進 NAudio／System.Speech。 -->
+
+</Project>

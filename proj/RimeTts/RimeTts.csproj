@@ -1,21 +1,23 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
+	<!-- 業務程序集：打字監聽、成句、翻譯、語音合成與播放的實作，
+		 以及跨專案共用的契約（DTO、服務接口、配置鍵、異常鍵、日誌門面）。
+
+		 *它自己不是可執行程式*：入口在 RimeTts.Cli。這樣 Test／Scripts 才能引用它來跑用例，
+		 而不必把整個宿主一起併進來。
+
+		 *共用基礎依賴不寫這裡*：本地庫、DI、日誌套件一律在 ../Directory.Build.props；
+		 本檔只留「只有這個程序集才有」的東西。 -->
 	<PropertyGroup>
-		<TargetFramework>net10.0-windows</TargetFramework>
-		<ImplicitUsings>enable</ImplicitUsings>
-		<Nullable>enable</Nullable>
-		<UseWPF>true</UseWPF>
-		<PublishAot>false</PublishAot>
+		<RootNamespace>RimeTts</RootNamespace>
 	</PropertyGroup>
-	<ItemGroup>
-		<ProjectReference Include="../../../Tsinswreng.CsCore/proj/Tsinswreng.CsCore/Tsinswreng.CsCore.csproj" />
-	</ItemGroup>
-	<ItemGroup>
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.10" />
-		<PackageReference Include="Microsoft.Extensions.Http" Version="9.0.10" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.10" />
-		<PackageReference Include="NAudio" Version="2.2.1" />
-		<PackageReference Include="YamlDotNet" Version="16.3.0" />
-	</ItemGroup>
-</Project>
 
+	<ItemGroup>
+		<!-- 音頻播放（WaveOut 走 WinMM）與 WAV／MP3 讀取；只用得到這一個套件。 -->
+		<PackageReference Include="NAudio" Version="2.2.1" />
+
+		<!-- 離線 TTS：SAPI（Windows 自帶語音）。線上那條腿（gTTS）走 HttpClient，不需要套件。 -->
+		<PackageReference Include="System.Speech" Version="9.0.10" />
+	</ItemGroup>
+
+</Project>

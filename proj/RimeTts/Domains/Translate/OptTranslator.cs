@@ -1,0 +1,69 @@
+namespace RimeTts.Domains.Translate;
+
+[Doc($$"""
+翻譯（LLM）設定。
+
+*為何用 LLM 而不是傳統機器翻譯*：本工具要的是「一句中文 → 通順的英／日／西／義／法」，
+而且回應要快。傳統 MT 的譯文品質在這種短句、口語場景上明顯吃虧，故默認走兼容
+OpenAI 協議的接口，模型名可配置。
+
+*為何超時在這裡而不在流水線*：內層知道「這一次請求從發出到拿回內容」花了多久；
+外層只知道「這一句話從開始到現在」。超時屬於請求，故由本層的 {{nameof(TimeoutSec)}} 決定。
+""")]
+public class OptTranslator{
+
+	[Doc("LLM 接口的密鑰。空串＝沒配置，呼叫前就會被擋下。")]
+	public str ApiKey{get;set;} = "";
+
+	[Doc("兼容 OpenAI 協議的 chat completions 端點。")]
+	public str BaseUrl{get;set;} = "https://api.deepseek.com/chat/completions";
+
+	[Doc("模型名。這個工具對延遲敏感，故默認挑快的那一檔。")]
+	public str Model{get;set;} = "deepseek-v4-flash";
+
+	[Doc($$"""
+	單次請求的超時秒數。
+
+	*為何不共用 `HttpClient.Timeout`*：共用客戶端的超時是全域的，改一個請求的等待就得換一個客戶端；
+	每次請求各自一個 `CancellationTokenSource` 才能讓「這一句超時、下一句照常」成立。
+	""")]
+	public i32 TimeoutSec{get;set;} = 20;
+
+	[Doc($$"""
+	譯文快取的最大條目數。
+
+	*為何需要上限*：輸入法常重複打同一句話（改字、重打），不快取等於每次重付一次延遲；
+	但只增不減的字典在長駐進程裡就是內存泄漏。超過上限時淘汰最久未用的那一條。
+	`0` 表示不快取。
+	""")]
+	public i32 CacheCapacity{get;set;} = 256;
+
+	[Doc($$"""
+	沒有語言條目時的兜底提示詞（語言條目本身沒寫提示詞時也用它）。
+
+	*由我們規定輸出格式*：要求模型回 jsonr——JSON 加 raw string 文本塊，
+	於是譯文裡有引號、換行都不必轉義，解析也不必容忍一堆 `\n` 與 `\"`。
+	""")]
+	public str DefaultSystemPrompt{get;set;} = DfltSystemPrompt;
+
+	[Doc("兜底提示詞的默認值。默認值的唯一出處就是這裡；配置檔沒寫時取它。")]
+	public const str DfltSystemPrompt = """
+You are a fast translator. Translate the user's text into English.
+
+Return jsonr only, nothing else. jsonr is JSON plus C++ style raw strings.
+Reply exactly in this shape:
+
+{
+	"UserInputLang": "zh",
+	"TargetLang": "en",
+	"Translation": R"EOF(Translated Text)EOF"
+}
+
+Rules:
+- UserInputLang: the BCP-47 tag of the language you detected in the input.
+- TargetLang: must be exactly "en".
+- Translation: the translated text. Put it inside R"EOF(...)EOF" so you never escape quotes or newlines.
+- If the text cannot be translated, write: "Translation": null
+- Do not wrap the whole answer in markdown fences.
+""";
+}

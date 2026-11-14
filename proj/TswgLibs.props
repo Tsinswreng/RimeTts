@@ -1,0 +1,18 @@
+<Project>
+	<!-- 本地庫根目錄（工作區根下的 TswgLib\）。
+		 本專案與 TswgCsTpl_App／Ngan.Ime 共用同一個本地庫群，故引用一律寫
+		 `$(TswgLibsDir) + 庫目錄名`，庫搬家或改名時只改下面這一行。
+
+		 為甚麼用 $([MSBuild]::NormalizeDirectory(...)) 而不是裸的相對路徑：
+		 它把 `..` 展開成絕對路徑，於是 MSBuild 不管按「本 props 檔所在目錄」還是
+		 「當前專案目錄」解析，結果都一樣。本檔位於 RimeTts\proj\，故上溯兩層到工作區根。 -->
+	<PropertyGroup>
+		<TswgLibsDir>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)../../TswgLib'))</TswgLibsDir>
+	</PropertyGroup>
+
+	<!-- 屬性值寫錯（例如 TswgLib 真被改名）時，給一句人能看懂的錯，
+		 而不是讓 MSBuild 在後面拋「找不到專案」這種看不出根因的訊息。 -->
+	<Target Name="ChkTswgLibsDir" BeforeTargets="PrepareForBuild">
+		<Error Condition="!Exists('$(TswgLibsDir)')" Text="本地庫目錄不存在：$(TswgLibsDir)。請改 RimeTts/proj/TswgLibs.props 裏的 TswgLibsDir。" />
+	</Target>
+</Project>
