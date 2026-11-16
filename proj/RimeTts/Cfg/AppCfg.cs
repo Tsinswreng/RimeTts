@@ -1,4 +1,6 @@
-namespace RimeTts.Infra.Cfg;
+namespace RimeTts.Cfg;
+
+using RimeTts.Infra;
 
 using Tsinswreng.CsCfg;
 using RimeTts.Infra.Json;

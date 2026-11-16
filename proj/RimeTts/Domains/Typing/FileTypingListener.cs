@@ -63,9 +63,9 @@ public class FileTypingListener(
 	#Prm[{{nameof(Ct)}}][目前不參與：監看的啟動是同步的。保留參數是為了介面一致。]
 	#Throw[{{nameof(TypedErr)}}][兩個路徑有一個是空的（{{nameof(KeysErr.Common.ArgErr__)}}）時。]
 	""")]
-	public Task StartAsync(CT Ct){
+	public Task<nil> StartAsync(CT Ct){
 		if(Started){
-			return Task.CompletedTask;
+			return Task.FromResult(NIL);
 		}
 		if(str.IsNullOrWhiteSpace(Opt.SignalFile) || str.IsNullOrWhiteSpace(Opt.ContentFile)){
 			throw KeysErr.Common.ArgErr__.ToErr($"{nameof(Opt.SignalFile)} / {nameof(Opt.ContentFile)}");
@@ -96,13 +96,13 @@ public class FileTypingListener(
 		Log.LogInformation(
 			"typing listener started. signal={SignalFile}; content={ContentFile}",
 			Opt.SignalFile, Opt.ContentFile);
-		return Task.CompletedTask;
+		return Task.FromResult(NIL);
 	}
 
 	[Doc("停監看並釋放。")]
-	public Task StopAsync(CT Ct){
+	public Task<nil> StopAsync(CT Ct){
 		if(!Started){
-			return Task.CompletedTask;
+			return Task.FromResult(NIL);
 		}
 		Started = false;
 		if(Watcher is not null){
@@ -114,7 +114,7 @@ public class FileTypingListener(
 			Watcher = null;
 		}
 		Log.LogInformation("typing listener stopped");
-		return Task.CompletedTask;
+		return Task.FromResult(NIL);
 	}
 
 	[Doc($$"""
@@ -143,7 +143,7 @@ public class FileTypingListener(
 	讀內容檔並分派事件。
 	#Prm[{{nameof(SignalWriteUtc)}}][這次通知對應的信號檔寫入時間；只寫進日誌，不參與去重（理由見 {{nameof(DuplicateWindow)}}）。]
 	""")]
-	async Task ReadAndDispatchAsync(DateTime SignalWriteUtc){
+	async Task<nil> ReadAndDispatchAsync(DateTime SignalWriteUtc){
 		await ReadGate.WaitAsync();
 		try{
 			var Json = await ReadStableContentJsonAsync();
@@ -151,11 +151,11 @@ public class FileTypingListener(
 				Log.LogWarning(
 					"content json empty after retries. content={ContentFile}; signal={SignalFile}",
 					Opt.ContentFile, Opt.SignalFile);
-				return;
+				return NIL;
 			}
 			if(IsDuplicate(Json)){
 				Log.LogDebug("duplicate payload ignored");
-				return;
+				return NIL;
 			}
 			// 信號時間只留作診斷：同一份內容被兩個事件讀到時，這裡會看到兩個不同的時間戳，
 			// 而去重已經由「內容 ＋ 時間窗」處理掉了，不靠它。
@@ -168,6 +168,7 @@ public class FileTypingListener(
 		finally{
 			ReadGate.Release();
 		}
+		return NIL;
 	}
 
 	[Doc($$"""

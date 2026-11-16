@@ -1,5 +1,7 @@
 namespace RimeTts.Domains.Seg;
 
+using RimeTts.Cfg;
+
 [Doc($$"""
 句子劃分的設定。
 
@@ -14,11 +16,13 @@ public class OptSentenceSeg{
 
 	[Doc($$"""
 	無上屏間隔（毫秒）。自最後一次收到上屏起算，超過這個時間就成句。
-	默認 5000ms——太短會把一句話切成兩半，太長會讓人等。
 
 	*這是唯一的「等」*：本工具沒有回車確認的機制，全靠這個時間窗。
+	*默認值（5000）的唯一出處是 `KeysAppCfg.SentenceSeg.NoCommitGapMs`*；
+	本屬性不帶默認（0 僅是「未映射」佔位，生產路徑一律由 `CfgMapper` 賦值，
+	且 `DiCore` 會驗證必須為正）——兩處各寫一份必然漂移（2026-11-16 審查 ARCH-2）。
 	""")]
-	public i64 NoCommitGapMs{get;set;} = 5000;
+	public i64 NoCommitGapMs{get;set;} = 0;
 
 	[Doc($$"""
 	成句終止符列表。上屏文本的最後一個字符是其中之一時，立刻成句（不必等間隔）。

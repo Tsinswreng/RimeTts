@@ -1,5 +1,7 @@
 //Impl: 聲明見 AppCfg.cs。
-namespace RimeTts.Infra.Cfg;
+namespace RimeTts.Cfg;
+
+using RimeTts.Infra;
 
 using System.Text.Json;
 using Tsinswreng.CsCfg;

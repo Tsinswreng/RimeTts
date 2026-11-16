@@ -6,10 +6,15 @@ namespace RimeTts.Test.Domains.Pipeline;
 
 public partial class TestAudioPlaylist{
 
-	[Doc("造一個被測對象與它的假播放器。")]
+	[Doc("造一個被測對象與它的假播放器；超時設定給足，避免測試被誤判為卡住。")]
 	static (AudioPlaylist Playlist, Fakes.FakeAudioPlayer Player) Mk(){
 		var Player = new Fakes.FakeAudioPlayer();
-		return (new AudioPlaylist(Player, NullLogger<AudioPlaylist>.Instance), Player);
+		var Opt = new OptPipeline{
+			GenerateTimeoutSec = 5,
+			MinPlayTimeoutSec = 5,
+			PlayGraceSec = 1,
+		};
+		return (new AudioPlaylist(Player, Opt, NullLogger<AudioPlaylist>.Instance), Player);
 	}
 
 	public partial void RegisterPlaylist(){

@@ -26,7 +26,7 @@ public interface IAudioPlayer{
 	#Throw[{{nameof(TypedErr)}}][檔案不存在（{{nameof(KeysErr.Tts.AudioFileNotFound__)}}）時。]
 	#Throw[{{nameof(OperationCanceledException)}}][{{nameof(Ct)}} 被取消時；播放會立刻停止。]
 	""")]
-	public Task PlayAsync(str AudioFile, CT Ct);
+	public Task<nil> PlayAsync(str AudioFile, CT Ct);
 
 	[Doc($$"""
 	取音頻檔的時長；讀不出來回 null（呼叫方據此退回一個默認超時）。
@@ -72,7 +72,7 @@ public partial class AudioPlayer : IAudioPlayer{
 	#Prm[{{nameof(AudioFile)}}][音頻檔路徑。]
 	#Prm[{{nameof(Ct)}}][取消即停止。]
 	""")]
-	public async Task PlayAsync(str AudioFile, CT Ct){
+	public async Task<nil> PlayAsync(str AudioFile, CT Ct){
 		if(!File.Exists(AudioFile)){
 			throw KeysErr.Tts.AudioFileNotFound__.ToErr(AudioFile);
 		}
@@ -83,17 +83,14 @@ public partial class AudioPlayer : IAudioPlayer{
 			if(Ext == ".wav"){
 				await PlayByWaveOutAsync(() => new WaveFileReader(AudioFile), Ct);
 				Log.LogDebug("audio played. file={File}", AudioFile);
-				return;
+				return NIL;
 			}
-			// mp3：ACM 解碼（純 P/Invoke）→ Media Foundation → MCI，逐一退讓。
-			var ByAcm = await TryPlayByReaderAsync(() => new Mp3FileReader(AudioFile), Ct, "acm");
-			if(ByAcm){
-				Log.LogDebug("audio played. file={File}; decoder=acm", AudioFile);
-				return;
-			}
-			if(await TryPlayByMediaFoundationAsync(AudioFile, Ct)){
-				Log.LogDebug("audio played. file={File}; decoder=mediafoundation", AudioFile);
-				return;
+			// mp3：ACM 解碼（純 P/Invoke）→ Media Foundation → MCI，逐一退讓（梯子見 Mp3Decoders）。
+			foreach(var Decoder in Mp3Decoders(AudioFile)){
+				if(await TryPlayByReaderAsync(Decoder, Ct)){
+					Log.LogDebug("audio played. file={File}; decoder={Decoder}", AudioFile, Decoder.Tag);
+					return NIL;
+				}
 			}
 			await PlayByMciAsync(AudioFile, Ct);
 			Log.LogDebug("audio played. file={File}; decoder=mci", AudioFile);
@@ -101,25 +98,52 @@ public partial class AudioPlayer : IAudioPlayer{
 		finally{
 			PlayGate.Release();
 		}
+		return NIL;
 	}
 
 	[Doc($$"""
-	用某個解碼器播一次；解不了就回 false。
-	*為何要分出來*：mp3 有兩三個解碼器可退讓，每一個都套同一段「試、失敗就換」的邏輯，
-	寫成參數化的方法比複製三段 try/catch 好。
-	#Prm[{{nameof(MkReader)}}][解碼器工廠。]
-	#Prm[{{nameof(Tag)}}][日誌用的解碼器名字。]
+	一個解碼候選：名字（日誌用）、讀取器工廠、失敗回呼。
 	""")]
-	async Task<bool> TryPlayByReaderAsync(Func<WaveStream> MkReader, CT Ct, str Tag){
+	sealed record DecoderCandidate(str Tag, Func<WaveStream> MkReader, Action<Exception>? OnFail);
+
+	[Doc($$"""
+	mp3 的解碼候選梯：ACM → Media Foundation（這個運行環境還值得試的話）。
+	MCI 不是 `WaveStream`，不入梯，永遠是最後的單獨退路。
+
+	*為何收成一份（2026-11-16 審查 MAINT-1）*：播放與時長查詢都要走同一串退讓，
+	原本兩處各寫一遍「先 ACM、再 MF、最後 MCI」，一處加了新解碼器另一處就漏。
+
+	*為何 MF 要問 {{nameof(IsMfWorthTrying)}}*：NAudio 的 Media Foundation 互操作是手寫的
+	`[ComImport]` 介面，需要 `ComWrappers` 註冊；NativeAOT 下它會在
+	`MFCreateSourceReaderFromURL` 直接拋 `NotSupportedException: COM Interop requires
+	ComWrapper instance registered for marshalling`（本專案實測）。
+	這個能力在一個行程內不會變，故失敗一次（由 {{nameof(MarkMfUnusable)}} 記下）
+	就永久跳過，免得每段音頻都拋一次、日誌被灌滿。
+	""")]
+	IEnumerable<DecoderCandidate> Mp3Decoders(str AudioFile){
+		yield return new DecoderCandidate("acm", () => new Mp3FileReader(AudioFile), null);
+		if(IsMfWorthTrying){
+			yield return new DecoderCandidate("mediafoundation", () => new MediaFoundationReader(AudioFile), MarkMfUnusable);
+		}
+	}
+
+	[Doc($$"""
+	用某個解碼候選播一次；解不了就回 false 換下一個。
+	*取消為什麼不能吞*：播放途中被取消也是拋 `OperationCanceledException`，
+	若當成「解不了」就會改用下一個解碼器再播一次，等於取消無效。
+	#Prm[{{nameof(Decoder)}}][解碼候選（名字／工廠／失敗回呼）。]
+	""")]
+	async Task<bool> TryPlayByReaderAsync(DecoderCandidate Decoder, CT Ct){
 		try{
-			await PlayByWaveOutAsync(MkReader, Ct);
+			await PlayByWaveOutAsync(Decoder.MkReader, Ct);
 			return true;
 		}
 		catch(OperationCanceledException){
 			throw;
 		}
 		catch(Exception Ex){
-			Log.LogDebug(Ex, "decoder {Decoder} failed. file will be retried with the next decoder", Tag);
+			Log.LogDebug(Ex, "decoder {Decoder} failed. file will be retried with the next decoder", Decoder.Tag);
+			Decoder.OnFail?.Invoke(Ex);
 			return false;
 		}
 	}
@@ -129,7 +153,7 @@ public partial class AudioPlayer : IAudioPlayer{
 	*為何把 Reader 用工廠傳進來*：解碼器可能是 `WaveFileReader` 也可能是 `MediaFoundationReader`，
 	兩者都要在同一個「播完／取消」框架裡跑。
 	""")]
-	async Task PlayByWaveOutAsync(Func<WaveStream> MkReader, CT Ct){
+	async Task<nil> PlayByWaveOutAsync(Func<WaveStream> MkReader, CT Ct){
 		await Task.Run(async () => {
 			Ct.ThrowIfCancellationRequested();
 			using var Reader = MkReader();
@@ -159,40 +183,12 @@ public partial class AudioPlayer : IAudioPlayer{
 			// 見本類說明：Stop 引起的「正常播完」要在這裡被糾正成取消。
 			Ct.ThrowIfCancellationRequested();
 		}, Ct);
-	}
-
-	[Doc($$"""
-	試著用 Media Foundation 播 mp3；解不了就回 false 讓呼叫方換 MCI。
-
-	*為何要記住「這個運行環境用不了 MF」*：NAudio 的 Media Foundation 互操作是手寫的
-	`[ComImport]` 介面，需要 `ComWrappers` 註冊；NativeAOT 下它會在
-	`MFCreateSourceReaderFromURL` 直接拋 `NotSupportedException: COM Interop requires
-	ComWrapper instance registered for marshalling`（本專案實測）。
-	這個能力在一個行程內不會變，故失敗一次就永久跳過，免得每段音頻都拋一次、日誌被灌滿。
-
-	*取消為什麼不能吞*：MF 播放途中被取消也是拋 `OperationCanceledException`，
-	若當成「解不了」就會改用 MCI 再播一次，等於取消無效。
-	""")]
-	async Task<bool> TryPlayByMediaFoundationAsync(str AudioFile, CT Ct){
-		if(!IsMfWorthTrying){
-			return false;
-		}
-		try{
-			await PlayByWaveOutAsync(() => new MediaFoundationReader(AudioFile), Ct);
-			return true;
-		}
-		catch(OperationCanceledException){
-			throw;
-		}
-		catch(Exception Ex){
-			MarkMfUnusable(Ex);
-			return false;
-		}
+		return NIL;
 	}
 
 	[Doc($$"""
 	Media Foundation 在這個運行環境是否可用；null＝還沒試過。
-	*為何要有這一個旗標*：見 {{nameof(TryPlayByMediaFoundationAsync)}}；
+	*為何要有這一個旗標*：見 {{nameof(Mp3Decoders)}}；
 	它同時決定時長能不能用 MF 去讀。
 	""")]
 	bool? MfUsable;
@@ -227,7 +223,7 @@ public partial class AudioPlayer : IAudioPlayer{
 	*為何這條路對 AOT 友好*：MCI 是 `winmm.dll` 的命令字符串接口，沒有托管 COM 包裝；
 	不需要 `BuiltInComInteropSupport` 也能用。
 	""")]
-	async Task PlayByMciAsync(str AudioFile, CT Ct){
+	async Task<nil> PlayByMciAsync(str AudioFile, CT Ct){
 		var Alias = "RimeTtsAudio" + Guid.NewGuid().ToString("N");
 		await Task.Run(() => {
 			try{
@@ -249,6 +245,7 @@ public partial class AudioPlayer : IAudioPlayer{
 				TrySendMciCommand($"close {Alias}");
 			}
 		}, Ct);
+		return NIL;
 	}
 
 	[Doc($$"""
@@ -256,7 +253,7 @@ public partial class AudioPlayer : IAudioPlayer{
 	*為何要試三種寫法*：不同 Windows 版本對 `open` 的參數寬容度不同，
 	帶 `type mpegvideo` 與不帶的行為不一致；逐個試比「猜對一個」穩。
 	""")]
-	static void OpenByMci(str AudioFile, str Alias){
+	void OpenByMci(str AudioFile, str Alias){
 		str[] Commands = [
 			$"open \"{AudioFile}\" alias {Alias}",
 			$"open \"{AudioFile}\" type mpegvideo alias {Alias}",
@@ -276,24 +273,29 @@ public partial class AudioPlayer : IAudioPlayer{
 	}
 
 	[Doc("讀 MCI 設備的當前狀態（`playing`／`paused`／`stopped`）。")]
-	static str GetMciMode(str Alias){
+	str GetMciMode(str Alias){
 		var Buffer = new char[128];
 		SendMciCommand($"status {Alias} mode", Buffer);
 		return CharBufferToString(Buffer).Trim().ToLowerInvariant();
 	}
 
-	[Doc("發一條 MCI 命令；非 0 返回碼換成可讀錯誤，方便日誌定位。")]
-	static void SendMciCommand(str Command, char[]? Buffer = null){
+	[Doc($$"""
+	發一條 MCI 命令；非 0 返回碼換成可讀錯誤，方便日誌定位。
+	*日誌走注入的 {{nameof(ILogger)}} 而不是 {{nameof(AppLog)}}（2026-11-16 審查 ARCH-3）*：
+	Domains 層的紅線是「只走構造注入、不碰靜態門面」；本類同類的失敗日誌都在
+	{{nameof(Log)}} 上，MCI 不該是例外。方法因此從 static 改成實例方法。
+	""")]
+	void SendMciCommand(str Command, char[]? Buffer = null){
 		// 前後各留一條 Debug：MCI 是外部設備接口，某些機器上會在呼叫裡卡住，
 		// 到時「有送出去但沒有回來」這兩條就是唯一的線索。
 		// *但輪詢不記*：播放期間每 100ms 一條 `status … mode`，記下來會把日誌灌滿。
 		var Trace = !Command.StartsWith("status", StringComparison.Ordinal);
 		if(Trace){
-			AppLog.Debug($"[mci] {Command}");
+			Log.LogDebug("[mci] {Command}", Command);
 		}
 		var Code = NativeMethods.MciSendString(Command, Buffer, Buffer?.Length ?? 0, IntPtr.Zero);
 		if(Trace){
-			AppLog.Debug($"[mci] -> {Code}");
+			Log.LogDebug("[mci] {Command} -> {Code}", Command, Code);
 		}
 		if(Code != 0){
 			throw KeysErr.Tts.MciCommandFailed__.WithMsg($"{Command} -> {Code}: {GetMciErrorText(Code)}");
@@ -301,7 +303,7 @@ public partial class AudioPlayer : IAudioPlayer{
 	}
 
 	[Doc("清理階段盡量吞錯，避免掩蓋原始異常。")]
-	static void TrySendMciCommand(str Command){
+	void TrySendMciCommand(str Command){
 		try{
 			SendMciCommand(Command);
 		}
@@ -341,14 +343,12 @@ public partial class AudioPlayer : IAudioPlayer{
 		if(Ext == ".wav"){
 			return TryReadDuration(() => new WaveFileReader(AudioFile), null);
 		}
-		var ByAcm = TryReadDuration(() => new Mp3FileReader(AudioFile), null);
-		if(ByAcm is not null){
-			return ByAcm;
-		}
-		if(IsMfWorthTrying){
-			var ByMf = TryReadDuration(() => new MediaFoundationReader(AudioFile), MarkMfUnusable);
-			if(ByMf is not null){
-				return ByMf;
+		// 與播放同一條解碼梯（Mp3Decoders）：兩處的退讓順序必須一致，
+		// 否則會出現「時長讀得出來、播放卻不會用那個解碼器」的錯位。
+		foreach(var Decoder in Mp3Decoders(AudioFile)){
+			var ByReader = TryReadDuration(Decoder.MkReader, Decoder.OnFail);
+			if(ByReader is not null){
+				return ByReader;
 			}
 		}
 		return TryGetMciLength(AudioFile);

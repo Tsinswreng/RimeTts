@@ -10,7 +10,7 @@ using RimeTts.Domains.Translate;
 using RimeTts.Domains.Tts;
 using RimeTts.Domains.Typing;
 using RimeTts.Infra;
-using RimeTts.Infra.Cfg;
+using RimeTts.Cfg;
 using RimeTts.Infra.Json;
 using RimeTts.Infra.Os;
 
@@ -40,7 +40,7 @@ public static class DiCore{
 
 		// 1: 選項。全部由配置映射而來，默認值在 KeysAppCfg。
 		//    先映射、後驗證、再註冊：配置缺東西要在啟動時就報，而不是等第一句話進來。
-		//    這三條驗證都用 WithMsg 附一句人話，因為它們是使用者唯一能自己修好的錯。
+		//    這幾條驗證都用 WithMsg 附一句人話，因為它們是使用者唯一能自己修好的錯。
 		var FileOpt = CfgMapper.MkFileInteractor(Cfg);
 		if(str.IsNullOrWhiteSpace(FileOpt.ContentFile) || str.IsNullOrWhiteSpace(FileOpt.SignalFile)){
 			throw KeysErr.Common.ArgErr__.WithMsg(
@@ -56,12 +56,25 @@ public static class DiCore{
 			throw KeysErr.Cfg.NoLanguage__.WithMsg(
 				Todo.I18n("配置裡一個語言條目都沒有：LanguagePipeline.Languages 至少要有一項。"));
 		}
+		var SegOpt = CfgMapper.MkSentenceSeg(Cfg);
+		if(SegOpt.NoCommitGapMs <= 0){
+			// 0 或負數的效果是「每 200ms 一成句」——每個字都被當成獨立句子朗讀。那必須在啟動時擋下。
+			throw KeysErr.Common.ArgErr__.WithMsg(
+				Todo.I18n("配置 SentenceSeg.NoCommitGapMs 必須為正數（毫秒）。"));
+		}
+		var PipeOpt = CfgMapper.MkPipeline(Cfg);
+		if(PipeOpt.GenerateTimeoutSec <= 0 || PipeOpt.MinPlayTimeoutSec <= 0 || PipeOpt.PlayGraceSec < 0){
+			// Opt* 不再自帶默認值（見 KeysAppCfg 說明），超時類配置錯成 0 要在這裡立刻暴露，而不是運行期才卡住。
+			throw KeysErr.Common.ArgErr__.WithMsg(
+				Todo.I18n("配置 Pipeline.GenerateTimeoutSec / MinPlayTimeoutSec 必須為正數，PlayGraceSec 不得為負。"));
+		}
 
 		z.AddSingleton(FileOpt);
-		z.AddSingleton(CfgMapper.MkSentenceSeg(Cfg));
+		z.AddSingleton(SegOpt);
 		z.AddSingleton(TrOpt);
 		z.AddSingleton(CfgMapper.MkTts(Cfg, BaseDir));
 		z.AddSingleton(LangOpt);
+		z.AddSingleton(PipeOpt);
 
 		// 2: JSON 門面。注入的就是 AppJson.Inst 那一個，靜態與注入兩條路徑共用同一份選項。
 		z.AddSingleton<IJsonSerializer>(AppJson.Inst);

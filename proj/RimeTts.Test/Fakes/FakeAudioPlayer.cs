@@ -18,9 +18,9 @@ public class FakeAudioPlayer : IAudioPlayer{
 	public TimeSpan? Duration{get;set;} = TimeSpan.FromSeconds(1);
 
 	[Doc("播放：只記錄。")]
-	public Task PlayAsync(str AudioFile, CT Ct){
+	public Task<nil> PlayAsync(str AudioFile, CT Ct){
 		Played.Add(AudioFile);
-		return Task.CompletedTask;
+		return Task.FromResult(NIL);
 	}
 
 	[Doc("取時長：回測試指定的值。")]

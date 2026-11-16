@@ -1,4 +1,4 @@
-using RimeTts.Infra.Cfg;
+using RimeTts.Cfg;
 using System.Reflection;
 using Tsinswreng.CsTreeTest;
 using Tsinswreng.CsKeyNode;

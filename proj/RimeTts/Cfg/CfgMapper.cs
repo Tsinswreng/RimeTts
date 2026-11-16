@@ -1,7 +1,10 @@
-namespace RimeTts.Infra.Cfg;
+namespace RimeTts.Cfg;
+
+using RimeTts.Infra;
 
 using Tsinswreng.CsCfg;
 using Tsinswreng.CsKeyNode;
+using RimeTts.Domains.Pipeline;
 using RimeTts.Domains.Seg;
 using RimeTts.Domains.Tts;
 using RimeTts.Domains.Translate;
@@ -43,12 +46,22 @@ public static partial class CfgMapper{
 	[Doc("讀語言流水線（順序、提示詞、各語言引擎）。")]
 	public static partial OptLanguagePipeline MkLanguagePipeline(ICfgReader Cfg);
 
+	[Doc("讀編排層的超時設定（生成超時、播放超時與其餘量）。")]
+	public static partial OptPipeline MkPipeline(ICfgReader Cfg);
+
 	[Doc($$"""
 	讀一個字串清單型鍵：配置有就用配置，沒有就用鍵上宣告的默認清單。
 	*為何要轉型*：值模型給的是 `IList<obj?>`，元素可能是字串或數字；
 	本專案的清單都是字串（終止符、引擎名），非字串元素轉成它的 invariant 表示再收下。
 	""")]
 	private static partial IList<str> ReadStrList(ICfgReader Cfg, Tsinswreng.CsKeyNode.KeyNode<IList<str>> Key);
+
+	[Doc($$"""
+	把裸值清單（`IList<obj?>`）逐項轉成 `List<str>`。
+	*為何抽出來*：鍵版與字典版（語言條目內的清單）的逐項轉換完全相同，
+	各寫一份就會漂移（2026-11-16 審查 MAINT-1）。
+	""")]
+	private static partial List<str> ToStrList(IList<obj?> Items);
 
 	[Doc($$"""
 	讀語言條目清單。

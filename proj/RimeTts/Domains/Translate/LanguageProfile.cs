@@ -35,6 +35,13 @@ public class LanguageProfile{
 """)]
 public class OptLanguagePipeline{
 
-	[Doc("語言條目，順序即翻譯與播放順序。空清單＝退化為只翻英文（見 FastLlmTranslator 的兜底）。")]
-	public IList<LanguageProfile> Languages{get;set;} = DfltLanguageProfiles.MkAll();
+	[Doc($$"""
+	語言條目，順序即翻譯與播放順序。
+
+	*默認清單（英日西義法）的唯一出處是 `KeysAppCfg.LanguagePipeline.Languages`*；
+	本屬性中性空清單——原寫法每次構造都會生成五份提示詞長串，而它在生產路徑
+	立刻被 `CfgMapper` 的映射結果覆蓋，純屬浪費（2026-11-16 審查 ARCH-2）。
+	空清單在啟動驗證（`DiCore`）就會被擋下，不會走到「退化翻譯」。
+	""")]
+	public IList<LanguageProfile> Languages{get;set;} = new List<LanguageProfile>();
 }

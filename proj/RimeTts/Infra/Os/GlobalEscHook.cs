@@ -55,6 +55,9 @@ public sealed class GlobalEscHook : IGlobalCancelHotkey{
 	[Doc("專職跑消息循環的背景線程。")]
 	Thread? Worker;
 
+	[Doc("鉤子線程在裝鉤階段拋出的異常（若有）；由 Start 讀取並附到它拋的錯上。")]
+	Exception? StartFailure;
+
 	[Doc("是否已經裝過；重複 Start 是 no-op。")]
 	bool Started;
 
@@ -77,10 +80,14 @@ public sealed class GlobalEscHook : IGlobalCancelHotkey{
 		};
 		Worker.Start();
 		// 等鉤子裝好（或失敗）再返回，否則呼叫方無法得知 Start 是否真的生效。
+		// Ready.Set 在鉤子線程裡是 try/finally 必達的（見 HookThreadMain），
+		// 故這裡的等待有界——不會因為裝鉤途中拋異常而永久掛起。
 		Ready.Wait();
 		if(Hook == IntPtr.Zero){
-			throw KeysErr.Hotkey.EscHookFailed__.ToErr(
-				new Win32Exception(Marshal.GetLastWin32Error()).Message);
+			var Reason = StartFailure is null
+				? new Win32Exception(Marshal.GetLastWin32Error()).Message
+				: StartFailure.Message;
+			throw KeysErr.Hotkey.EscHookFailed__.ToErr(Reason);
 		}
 		Started = true;
 	}
@@ -112,13 +119,25 @@ public sealed class GlobalEscHook : IGlobalCancelHotkey{
 
 	[Doc("鉤子線程主體：裝鉤子 → 跑消息循環 → 卸鉤子。")]
 	void HookThreadMain(){
-		ThreadId = GetCurrentThreadId();
-		using var CurProcess = Process.GetCurrentProcess();
-		using var CurModule = CurProcess.MainModule;
-		var ModuleName = CurModule?.ModuleName ?? "";
-		Hook = SetWindowsHookEx(WH_KEYBOARD_LL, Proc, GetModuleHandle(ModuleName), 0);
-		// 先放行 Start，讓它去檢查 Hook 是否為 Zero 並決定要不要拋。
-		Ready.Set();
+		// Ready.Set 必須必達（2026-11-16 審查 BUG-6 的修復）：
+		// 裝鉤子之前有 GetCurrentProcess／MainModule／GetModuleHandle 這些可拋的呼叫，
+		// 一旦在中途拋出，Start 裡的 Ready.Wait() 就永久掛起（進程殭屍）。
+		// 失敗原因帶回欄位，由 Start 讀取並附在異常上。
+		try{
+			ThreadId = GetCurrentThreadId();
+			using var CurProcess = Process.GetCurrentProcess();
+			using var CurModule = CurProcess.MainModule;
+			var ModuleName = CurModule?.ModuleName ?? "";
+			Hook = SetWindowsHookEx(WH_KEYBOARD_LL, Proc, GetModuleHandle(ModuleName), 0);
+		}
+		catch(Exception Ex){
+			// 不讓未處理異常帶崩進程：記下原因，交給 Start 決定。
+			StartFailure = Ex;
+		}
+		finally{
+			// 無論裝成、失敗、還是拋了，都先放行 Start——它的等待就此有界。
+			Ready.Set();
+		}
 		if(Hook == IntPtr.Zero){
 			return;
 		}

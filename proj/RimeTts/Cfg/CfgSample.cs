@@ -1,4 +1,6 @@
-namespace RimeTts.Infra.Cfg;
+namespace RimeTts.Cfg;
+
+using RimeTts.Infra;
 
 using System.Text;
 using RimeTts.Domains.Translate;
@@ -94,6 +96,15 @@ public static class CfgSample{
 		"Languages": [
 {{Blocks}}
 		]
+	},
+
+	"Pipeline": {
+		// 單段音頻生成的超時（秒）；超過就當這個語言失敗
+		"GenerateTimeoutSec": 40,
+		// 極短音頻也至少給這麼多播放超時（秒）
+		"MinPlayTimeoutSec": 20,
+		// 播放超時在音頻真實長度之外多給的餘量（秒）
+		"PlayGraceSec": 10
 	}
 }
 """;

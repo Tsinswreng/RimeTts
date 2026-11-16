@@ -1,4 +1,4 @@
-namespace RimeTts.Infra.Cfg;
+namespace RimeTts.Cfg;
 
 using Microsoft.Extensions.DependencyInjection;
 using Tsinswreng.CsCfg;

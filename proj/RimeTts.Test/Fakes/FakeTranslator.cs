@@ -20,11 +20,34 @@ public class FakeTranslator : ITranslator{
 	[Doc("人為延遲（毫秒）；用來造出「後面的語言先翻完」這種順序。")]
 	public i32 DelayMs{get;set;}
 
+	[Doc("按語言指定延遲（毫秒）；設了就蓋過全體的 DelayMs，用來造「某語言懸住」。")]
+	public IDictionary<str, i32> DelayMsByLang{get;} = new Dictionary<str, i32>();
+
+	[Doc("按語言指定要拋的異常；用來測單一語言失敗的隔離。")]
+	public IDictionary<str, Exception> FailByLang{get;} = new Dictionary<str, Exception>();
+
+	[Doc($$"""
+	按語言指定「懸住用的取消源」：設了之後，該語言的延遲改掛在這個*內部*令牌上。
+	用來模擬翻譯器內部的請求級超時——`HttpClient` 在內部 CTS 到點時拋的
+	`OperationCanceledException` 正是這種：內部令牌已取消、外部（全局）令牌從未取消。
+	""")]
+	public IDictionary<str, CancellationTokenSource> InternalCancelByLang{get;} = new Dictionary<str, CancellationTokenSource>();
+
 	[Doc("翻譯：把結果寫成 `<語言>:<原文>`。")]
 	public async Task<RespTranslate> Translate(ReqTranslate Req, CT Ct){
 		RequestedLangs.Add(Req.TargetLanguage);
-		if(DelayMs > 0){
-			await Task.Delay(DelayMs, Ct);
+		if(FailByLang.TryGetValue(Req.TargetLanguage, out var Ex)){
+			throw Ex;
+		}
+		if(InternalCancelByLang.TryGetValue(Req.TargetLanguage, out var InternalCts)){
+			// 掛在內部令牌上：它取消時拋的 OCE 不帶外部令牌的印記，
+			// 正是扇出層必須過濾掉的那一種（BUG-1 的場景）。
+			await Task.Delay(Timeout.Infinite, InternalCts.Token);
+			throw new OperationCanceledException(InternalCts.Token);
+		}
+		var Delay = DelayMsByLang.TryGetValue(Req.TargetLanguage, out var D) ? D : DelayMs;
+		if(Delay > 0){
+			await Task.Delay(Delay, Ct);
 		}
 		var Translated = NullLangs.Contains(Req.TargetLanguage)
 			? null

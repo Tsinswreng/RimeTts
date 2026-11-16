@@ -2,7 +2,7 @@ namespace RimeTts.Cli;
 
 using Microsoft.Extensions.DependencyInjection;
 using RimeTts.Infra;
-using RimeTts.Infra.Cfg;
+using RimeTts.Cfg;
 using RimeTts.Infra.Log;
 
 [Doc($$"""

@@ -21,9 +21,10 @@
 
 		<!-- *全域不開 NativeAOT*：本專案要發佈的是命令列工具，它的 TTS 兩條腿
 			 （NAudio 的 WinMM/WASAPI、System.Speech 的 SAPI COM）都是 Windows 上的
-			 原生互操作，AOT 下能否工作未經驗證；先保持 JIT，AOT 由 RimeTts.Scripts 的
-			 TestAotWin 明確以 `-p:PublishAot=true` 單獨驗證，失敗也只是一個待辦，
-			 不會讓整個專案連編譯都編不了。 -->
+			 原生互操作，AOT 下能否工作未經驗證；先保持 JIT。
+			 AOT 由 RimeTts.Scripts 的 TestAotWin 以項目私有屬性 `-p:AotTest=true` 單獨驗證
+			 （*不是* `-p:PublishAot=true`——RimeTts.Test.csproj 的註釋說明了原因），
+			 失敗也只是一個待辦，不會讓整個專案連編譯都編不了。 -->
 		<PublishAot>false</PublishAot>
 
 		<!-- *不要開 InvariantGlobalization*：System.Speech 選語音要用
@@ -51,7 +52,6 @@
 		 NuGet 上的 alpha 版與本地 API 已經對不上（例如 CsCfg 的檔案源、CsJsonr 整個庫）。 -->
 	<ItemGroup>
 		<ProjectReference Include="$(TswgLibsDir)CsCore/proj/Tsinswreng.CsCore/Tsinswreng.CsCore.csproj" />
-		<ProjectReference Include="$(TswgLibsDir)CsTempus/proj/Tsinswreng.CsTempus/Tsinswreng.CsTempus.csproj" />
 		<ProjectReference Include="$(TswgLibsDir)CsKeyNode/proj/Tsinswreng.CsKeyNode/Tsinswreng.CsKeyNode.csproj" />
 		<ProjectReference Include="$(TswgLibsDir)CsErr/proj/Tsinswreng.CsErr/Tsinswreng.CsErr.csproj" />
 		<ProjectReference Include="$(TswgLibsDir)CsJson/proj/Tsinswreng.CsJson/Tsinswreng.CsJson.csproj" />

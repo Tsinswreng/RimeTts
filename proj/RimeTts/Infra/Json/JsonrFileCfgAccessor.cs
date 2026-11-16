@@ -3,7 +3,7 @@ namespace RimeTts.Infra.Json;
 using System.Text;
 using Tsinswreng.CsCfg.Json;
 using Tsinswreng.CsJsonr;
-using RimeTts.Infra.Cfg;
+using RimeTts.Cfg;
 
 [Doc($$"""
 以 jsonr 檔案為來源的**可讀可寫**配置源。

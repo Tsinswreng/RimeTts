@@ -1,7 +1,6 @@
 namespace RimeTts.Domains.Tts;
 
 using System.Net.Http;
-using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using RimeTts.Infra;
@@ -47,15 +46,17 @@ public class GttsViaHttpTts(
 	#Rtn[mp3 檔的絕對路徑。]
 	""")]
 	public async Task<str> GenerateAudio(ReqGenEtPlay Req, CT Ct){
-		var Text = Req.Text?.Trim() ?? "";
+		// Text 在 DTO 上非空（默認 ""），這裡驗的是「呼叫方有沒有給東西」，
+		// 不必再對非空型別做 `?.`（2026-11-16 審查清掉）。
+		var Text = Req.Text.Trim();
 		if(Text.Length == 0){
 			throw KeysErr.Common.ArgErr__.ToErr(nameof(Req.Text));
 		}
-		var Lang = LangTag.Normalize(Req.Language) is { Length: > 0 } L ? L : "en";
+		var Lang = LangTag.Ensure(Req.Language);
 
 		Directory.CreateDirectory(Opt.OutputDir);
-		// 檔名要含語言：同一句中文的英譯與日譯是不同音頻，只按文本雜湊會拿錯檔案。
-		var FilePath = Path.Combine(Opt.OutputDir, $"gtts_{HashHex(Lang + "\n" + Text)}.mp3");
+		// 命名規則（含語言段）見 TtsCacheFile——兩個引擎必須共用同一份。
+		var FilePath = TtsCacheFile.MkPath(Opt.OutputDir, "gtts", Lang, Text, ".mp3");
 		if(File.Exists(FilePath)){
 			return FilePath;
 		}
@@ -71,7 +72,7 @@ public class GttsViaHttpTts(
 	#Prm[{{nameof(Lang)}}][語言代碼。]
 	#Prm[{{nameof(OutMp3Path)}}][目標檔案。]
 	""")]
-	async Task DownloadAsync(str Text, str Lang, str OutMp3Path, CT Ct){
+	async Task<nil> DownloadAsync(str Text, str Lang, str OutMp3Path, CT Ct){
 		var Chunks = SplitText(Text, MaxChunkChars);
 		var TmpPath = OutMp3Path + ".tmp";
 		try{
@@ -86,13 +87,14 @@ public class GttsViaHttpTts(
 			File.Move(TmpPath, OutMp3Path, overwrite: true);
 		}
 		catch{
-			TryDel(TmpPath);
+			TtsCacheFile.TryDel(TmpPath);
 			throw;
 		}
+		return NIL;
 	}
 
 	[Doc("抓一片並追加寫入輸出流。")]
-	async Task AppendChunkAsync(str Chunk, str Lang, Stream OutFs, CT Ct){
+	async Task<nil> AppendChunkAsync(str Chunk, str Lang, Stream OutFs, CT Ct){
 		var Url = Endpoint
 			+ $"?ie=UTF-8&client=tw-ob&tl={Uri.EscapeDataString(Lang)}&q={Uri.EscapeDataString(Chunk)}";
 		using var Req = new HttpRequestMessage(HttpMethod.Get, Url);
@@ -108,6 +110,7 @@ public class GttsViaHttpTts(
 		Resp.EnsureSuccessStatusCode();
 		await using var In = await Resp.Content.ReadAsStreamAsync(Ct);
 		await In.CopyToAsync(OutFs, Ct);
+		return NIL;
 	}
 
 	[Doc($$"""
@@ -137,25 +140,5 @@ public class GttsViaHttpTts(
 	[Doc("句讀點（中英混合）。")]
 	static bool IsBoundary(char C){
 		return C is '。' or '！' or '？' or '；' or '，' or '.' or '!' or '?' or ';' or ',';
-	}
-
-	[Doc("文本的 SHA-256 十六進制串；用作快取檔名。")]
-	static str HashHex(str Text){
-		return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Text))).ToLowerInvariant();
-	}
-
-	[Doc("盡力刪掉殘檔；清理失敗不影響主流程。")]
-	static void TryDel(str Path){
-		try{
-			if(File.Exists(Path)){
-				File.Delete(Path);
-			}
-		}
-		catch(IOException){
-			// 殘檔留著只是礙眼，不影響快取的正確性（同名檔案下次會被覆寫）。
-		}
-		catch(UnauthorizedAccessException){
-			// 同上。
-		}
 	}
 }

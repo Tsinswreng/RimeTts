@@ -19,6 +19,12 @@ using RimeTts.Infra.Log;
 
 *為何快取在這一層*：同一句話常被重打，快取鍵是「語言 ＋ 提示詞 ＋ 原文」。
 把提示詞算進鍵是刻意的——改了提示詞就該是一次新的翻譯，而不是命中舊譯文。
+
+*快取的定性（2026-11-16 審查 BUG-3 的修復）*：只有*模型給出的確定結論*才進快取——
+譯文成功，或模型明確回了 null（翻不了）。*我這端的解析失敗*（回應不是合法 jsonr）
+與*目標語言不符*都不進快取：那是模型一次手滑，若也定性成「翻不了」，
+同一句＋同一語言在 LRU 淘汰前永遠被跳過、不再重試——一次失誤變成永久跳過。
+這兩類只回 null（本次跳過），下一次同句仍會真的再問一次。
 """)]
 public class FastLlmTranslator(
 	OptTranslator Opt,
@@ -35,7 +41,7 @@ public class FastLlmTranslator(
 	""")]
 	public async Task<RespTranslate> Translate(ReqTranslate Req, CT Ct){
 		var Source = Req.SourceText;
-		var Lang = LangTag.Normalize(Req.TargetLanguage) is { Length: > 0 } L ? L : "en";
+		var Lang = LangTag.Ensure(Req.TargetLanguage);
 		var Prompt = str.IsNullOrWhiteSpace(Req.SystemPrompt)
 			? Opt.DefaultSystemPrompt
 			: Req.SystemPrompt.Trim();
@@ -57,9 +63,13 @@ public class FastLlmTranslator(
 
 		var Content = await RequestContentAsync(Source, Prompt, Ct);
 		var Answer = LlmAnswerReader.ParseAnswer(Content);
-		var Translated = InterpretAnswer(Lang, Source, Answer, Content);
+		var (Translated, Definitive) = InterpretAnswer(Lang, Source, Answer, Content);
 
-		Cache.Set(CacheKey, Translated);
+		// 只有模型的確定結論才進快取；解析失敗／語言不符是「這一次的意外」，不進
+		//（見本類說明——進了就是「一次手滑＝永久跳過」，2026-11-16 審查 BUG-3）。
+		if(Definitive){
+			Cache.Set(CacheKey, Translated);
+		}
 		return new RespTranslate{ SourceText = Source, TargetLanguage = Lang, TranslatedText = Translated };
 	}
 
@@ -69,29 +79,32 @@ public class FastLlmTranslator(
 	#Prm[{{nameof(Source)}}][原文，僅用於日誌。]
 	#Prm[{{nameof(Answer)}}][解析結果；null 表示格式沒對上。]
 	#Prm[{{nameof(Content)}}][原始正文，僅在失敗時截斷記日誌。]
-	#Rtn[譯文或 null。]
+	#Rtn[譯文（或 null），與「這是不是模型的確定結論」——確定結論才可進快取。]
 	""")]
-	str? InterpretAnswer(str Lang, str Source, ResLlm? Answer, str Content){
+	(str? Translated, bool Definitive) InterpretAnswer(str Lang, str Source, ResLlm? Answer, str Content){
 		if(Answer is null){
 			Log.LogWarning(
 				"translator response is not valid jsonr. lang={Lang}; source={Source}; response={Response}",
 				Lang, Source, Summarize(Content));
-			return null;
+			// 解析失敗是我這端與模型之間的一次性意外：可重試，不進快取。
+			return (null, false);
 		}
 		if(!LangTag.Same(Lang, Answer.TargetLang)){
 			Log.LogWarning(
 				"translator target lang mismatch. expected={Expected}; actual={Actual}; source={Source}",
 				Lang, Answer.TargetLang ?? "", Source);
-			return null;
+			// 模型答錯了語言：同樣是意外而非結論，可重試。
+			return (null, false);
 		}
 
 		var Translated = Answer.Translation?.Trim();
 		if(str.IsNullOrWhiteSpace(Translated) || IsNullLiteral(Translated)){
 			Log.LogWarning("translation is null; skip speaking. source={Source}; lang={Lang}", Source, Lang);
-			return null;
+			// 模型明確回了 null：這是它的結論，可以快取（下次同句不再重問）。
+			return (null, true);
 		}
 		Log.LogTranslationText(Lang, Translated);
-		return Translated;
+		return (Translated, true);
 	}
 
 	[Doc($$"""

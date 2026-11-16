@@ -1,4 +1,4 @@
-using RimeTts.Infra.Cfg;
+using RimeTts.Cfg;
 using Tsinswreng.CsTreeTest;
 
 namespace RimeTts.Test.Domains.Cfg;

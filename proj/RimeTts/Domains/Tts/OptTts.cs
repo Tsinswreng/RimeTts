@@ -1,5 +1,6 @@
 namespace RimeTts.Domains.Tts;
 
+using RimeTts.Cfg;
 using RimeTts.Domains.Translate;
 
 [Doc($$"""
@@ -13,15 +14,19 @@ using RimeTts.Domains.Translate;
 """)]
 public class OptTts{
 
-	[Doc(@$"生成的音頻檔輸出目錄。空串＝執行檔目錄下的 `tts-output`。
-	檔名是「文本內容的雜湊」，故同一句話第二次不再生成，直接播放已存在的檔案。")]
+	[Doc(@$"生成的音頻檔輸出目錄。空串＝執行檔目錄下的 `tts-output`（由 `CfgMapper.MkTts` 解析）。
+	檔名是「語言 ＋ 文本」的雜湊，故同一句話第二次不再生成，直接播放已存在的檔案。")]
 	public str OutputDir{get;set;} = "";
 
 	[Doc($$"""
 	全局引擎優先級，越前越優先。語言條目自己的 {{nameof(LanguageProfile.TtsEngines)}} 非空時以它為準。
 
+	*默認清單（gTTS → SystemSpeech）的唯一出處是 `KeysAppCfg.Tts.Engines`*；
+	本屬性中性空清單。兩者都空時 {{nameof(FallbackTts)}} 還有一道「註冊表內建順序」兜底
+	（引用各引擎的 {{nameof(GttsViaHttpTts.EngineName)}} 常量，不是另一次手抄）。
+
 	目前支援的名字（大小寫不敏感）：`{{nameof(GttsViaHttpTts.EngineName)}}`（人名即 gTTS）、
 	`{{nameof(SystemSpeechTts.EngineName)}}`（SAPI）。
 	""")]
-	public IList<str> Engines{get;set;} = new List<str>{ GttsViaHttpTts.EngineName, SystemSpeechTts.EngineName };
+	public IList<str> Engines{get;set;} = new List<str>();
 }

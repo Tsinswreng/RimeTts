@@ -3,6 +3,7 @@ using RimeTts.Test.Domains.Pipeline;
 using RimeTts.Test.Domains.Seg;
 using RimeTts.Test.Domains.Translate;
 using RimeTts.Test.Domains.Tts;
+using RimeTts.Test.Domains.Typing;
 namespace RimeTts.Test;
 
 using Tsinswreng.CsTreeTest;
@@ -44,5 +45,9 @@ public class RimeTtsTester : Tester{
 		this.AddTester<TestLlmPrompts>();
 		this.AddTester<TestFallbackTts>();
 		this.AddTester<TestAudioPlaylist>();
+		this.AddTester<TestSentenceFanout>();
+		this.AddTester<TestRimeTtsPipeline>();
+		this.AddTester<TestFastLlmTranslator>();
+		this.AddTester<TestFileTypingListener>();
 	}
 }

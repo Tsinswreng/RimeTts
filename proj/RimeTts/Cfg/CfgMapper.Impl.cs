@@ -1,8 +1,11 @@
 //Impl: 聲明見 CfgMapper.cs。
-namespace RimeTts.Infra.Cfg;
+namespace RimeTts.Cfg;
+
+using RimeTts.Infra;
 
 using Tsinswreng.CsCfg;
 using Tsinswreng.CsKeyNode;
+using RimeTts.Domains.Pipeline;
 using RimeTts.Domains.Seg;
 using RimeTts.Domains.Typing;
 using RimeTts.Domains.Tts;
@@ -53,17 +56,25 @@ public static partial class CfgMapper{
 		};
 	}
 
+	public static partial OptPipeline MkPipeline(ICfgReader Cfg){
+		return new OptPipeline{
+			GenerateTimeoutSec = Cfg.Get(KeysAppCfg.Pipeline.GenerateTimeoutSec),
+			MinPlayTimeoutSec = Cfg.Get(KeysAppCfg.Pipeline.MinPlayTimeoutSec),
+			PlayGraceSec = Cfg.Get(KeysAppCfg.Pipeline.PlayGraceSec),
+		};
+	}
+
 	private static partial IList<str> ReadStrList(ICfgReader Cfg, KeyNode<IList<str>> Key){
 		// 明確轉成非泛型鍵，才會呼叫「取裸值」那一版 TryGet：
 		// 泛型版會嘗試把清單轉成 IList<str>，而值模型只給 IList<obj?>，必然失敗。
-		if(!Cfg.TryGet((IKeyNode)Key, out var Got, out _) || Got is null){
+		if(!Cfg.TryGet((IKeyNode)Key, out var Got, out _) || Got is not IList<obj?> Items){
 			// 回一份拷貝：鍵上的默認清單是共享的，交出去之後被下游就地改就會污染下一次解析。
 			return [.. Key.Data];
 		}
-		if(Got is not IList<obj?> Items){
-			// 回一份拷貝：鍵上的默認清單是共享的，交出去之後被下游就地改就會污染下一次解析。
-			return [.. Key.Data];
-		}
+		return ToStrList(Items);
+	}
+
+	private static partial List<str> ToStrList(IList<obj?> Items){
 		var Result = new List<str>();
 		foreach(var Item in Items){
 			if(Item is null){

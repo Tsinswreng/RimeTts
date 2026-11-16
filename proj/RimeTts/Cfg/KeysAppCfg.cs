@@ -1,4 +1,4 @@
-namespace RimeTts.Infra.Cfg;
+namespace RimeTts.Cfg;
 
 using Tsinswreng.CsKeyNode;
 using RimeTts.Domains.Seg;
@@ -8,6 +8,11 @@ using RimeTts.Domains.Translate;
 [Doc($$"""
 配置鍵族（CsKeyNode）。
 
+*本類所在的 `RimeTts.Cfg` 是應用層，不是 `Infra`*：鍵的默認值要引用出廠語言表、
+引擎名這些*業務*事實（見各鍵的默認值），故配置層允許依賴 `Domains`；
+而 `Infra`（LangTag／Json／Log／Os）保持不依賴業務。
+依賴方向因此是單向的：Cfg → Domains → Infra。2026-11-16 審查（ARCH-1）後從 `Infra/Cfg` 上移至此。
+
 *鍵與值分離*：鍵在這裡聲明（有靜態型別、有默認值、可跳轉），值從
 {{nameof(AppCfg)}} 的兩個源裡按路徑取。業務側一律用 `AppCfg.Inst.Get(KeysAppCfg.Xxx)`，
 不得出現字符串鍵名。
@@ -16,8 +21,9 @@ using RimeTts.Domains.Translate;
 不參與取值。
 
 *默認值的唯一出處就是這裡*：第三個參數就是默認值。配置裡沒有這個鍵時，
-`ICfgReaderExtn.Get<T>` 直接回它。其他型別（例如 {{nameof(OptTts)}}）若也有默認值，
-必須與這裡一致，並註釋指明「本處只是鏡像」。
+`ICfgReaderExtn.Get<T>` 直接回它。`OptXxx` 選項物件上的屬性**不再各自帶業務默認值**
+（一律中性空值，見各 Opt 類的說明）——兩處各寫一份必然漂移，
+2026-11-16 審查（ARCH-2）已刪除這種雙寫。
 
 *列表型鍵為何是 `KeyNode<IList<T>>`*：值模型只認標量，`Get<T>` 沒辦法把一個 JSON 陣列
 直接轉成 `IList<T>`；故那幾個鍵的讀法是「先按鍵取裸值，取不到就用鍵上宣告的默認清單」，
@@ -131,5 +137,26 @@ public class KeysAppCfg : KeysDeclBase<KeysAppCfg>, IStaticKeysDecl{
 			,[nameof(Languages)]
 			,DfltLanguageProfiles.MkAll()
 		);
+	}
+
+	[Doc("編排層（扇出與播放隊列）的超時設定。")]
+	public static class Pipeline{
+
+		[Doc("本組的根節點。")]
+		public static KeyNode _R = Mk(null, [nameof(Pipeline)]);
+
+		[Doc($$"""
+		單段音頻生成的超時秒數。超過就把這個語言當失敗——讓整句話卡在一個引擎上不值得。
+
+		*為何放配置而不是代碼常量*：它與 `Translator.TimeoutSec` 是同一類旋鈕
+		（「等多久算放棄」），一半可配一半寫死會讓維護心智分裂（2026-11-16 審查 MAINT-3）。
+		""")]
+		public static KeyNode<i32> GenerateTimeoutSec = Mk(_R, [nameof(GenerateTimeoutSec)], 40);
+
+		[Doc("播放不足這個秒數時仍給這麼多超時；避免極短音頻因設備延遲被誤判為卡住。")]
+		public static KeyNode<i32> MinPlayTimeoutSec = Mk(_R, [nameof(MinPlayTimeoutSec)], 20);
+
+		[Doc("在音頻真實長度之外多給的餘量秒數：設備啟動、緩衝、系統繁忙。")]
+		public static KeyNode<i32> PlayGraceSec = Mk(_R, [nameof(PlayGraceSec)], 10);
 	}
 }

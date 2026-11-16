@@ -36,6 +36,21 @@ public static class LangTag{
 	}
 
 	[Doc($$"""
+	歸一化並保底：空輸入回 `en`。
+	*為何要它*：「歸一化，空則退 en」原本在翻譯器與兩個 TTS 引擎三處各寫一遍，
+	`en` 這個保底值也出現三次——一處改了其餘就漂移（2026-11-16 審查 MAINT-1 收攏）。
+	#Eg[
+		```cs
+		LangTag.Ensure(" JP ")  // "ja"
+		LangTag.Ensure("")      // "en"
+		```
+	]
+	""")]
+	public static str Ensure(str? Tag){
+		return Normalize(Tag) is { Length: > 0 } Norm ? Norm : "en";
+	}
+
+	[Doc($$"""
 	取 BCP-47 語言代碼對應的 {{nameof(CultureInfo)}}；取不到回 null。
 
 	*為何幾個常見語言要寫死完整文化*：`GetCultureInfo("ja")` 得到的是中性文化，

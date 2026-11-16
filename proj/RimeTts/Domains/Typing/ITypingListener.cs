@@ -21,8 +21,8 @@ public interface ITypingListener{
 	開始監聽。
 	#Throw[{{nameof(TypedErr)}}][路徑沒配置或不合法（{{nameof(KeysErr.Common.ArgErr__)}}）時。]
 	""")]
-	public Task StartAsync(CT Ct);
+	public Task<nil> StartAsync(CT Ct);
 
 	[Doc("停止監聽並釋放檔案監看器。重複呼叫安全。")]
-	public Task StopAsync(CT Ct);
+	public Task<nil> StopAsync(CT Ct);
 }
