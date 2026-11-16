@@ -69,8 +69,9 @@ public partial class TestRimeTtsPipeline{
 
 		T(Player.Played.Count == 2,
 			$"en 與 ja 各一段，實際 {Player.Played.Count} 段 [{string.Join(",", Player.Played)}]");
-		T(Player.Played[0] == "en.en:你好世界。.mp3", $"第一段應是 en，實際 {Player.Played[0]}");
-		T(Player.Played[1] == "ja.ja:你好世界。.mp3", $"第二段應是 ja，實際 {Player.Played[1]}");
+		// 成句＝片段以空格連接（你好＋世界。 → 「你好 世界。」）。
+		T(Player.Played[0] == "en.en:你好 世界。.mp3", $"第一段應是 en，實際 {Player.Played[0]}");
+		T(Player.Played[1] == "ja.ja:你好 世界。.mp3", $"第二段應是 ja，實際 {Player.Played[1]}");
 		return NIL;
 	}
 

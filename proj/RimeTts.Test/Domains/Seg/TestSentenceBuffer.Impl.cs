@@ -35,7 +35,8 @@ public partial class TestSentenceBuffer{
 		Time.Advance(TimeSpan.FromMilliseconds(100));
 		var Sentence = Buffer.Append("世界。");
 
-		T(Sentence == "你好世界。", $"應成句為「你好世界。」，實際「{Sentence}」");
+		// 各次上屏以單個空格連接（2026-11-16 用戶拍板）：詞邊界對 LLM 是顯式的。
+		T(Sentence == "你好 世界。", $"應成句為「你好 世界。」，實際「{Sentence}」");
 		return NIL;
 	}
 
@@ -49,10 +50,10 @@ public partial class TestSentenceBuffer{
 		Time.Advance(TimeSpan.FromMilliseconds(100));
 		T(Buffer.Append("三") is null, "沒有終止符時不該成句");
 
-		// 累積的內容要完整（順序正確、不丟字）。
+		// 累積的內容要完整（順序正確、不丟字），片段間以空格分隔。
 		Time.Advance(TimeSpan.FromMilliseconds(GapMs));
 		var Sentence = Buffer.TryFlushByIdle();
-		T(Sentence == "一二三", $"累積內容應為「一二三」，實際「{Sentence}」");
+		T(Sentence == "一 二 三", $"累積內容應為「一 二 三」，實際「{Sentence}」");
 		return NIL;
 	}
 
@@ -113,7 +114,7 @@ public partial class TestSentenceBuffer{
 
 		Time.Advance(TimeSpan.FromMilliseconds(GapMs));
 		var Sentence = Buffer.TryFlushByIdle();
-		T(Sentence == "你好。再一句！", $"只該由間隔成句，實際「{Sentence}」");
+		T(Sentence == "你好。 再一句！", $"只該由間隔成句，實際「{Sentence}」");
 		return NIL;
 	}
 }

@@ -1,7 +1,5 @@
 namespace RimeTts.Domains.Seg;
 
-using System.Text;
-
 [Doc($$"""
 把逐次上屏的文字累積成一句。
 
@@ -10,6 +8,11 @@ using System.Text;
 
 *「夠了」的兩個條件*（見 {{nameof(OptSentenceSeg)}}）：
 上屏以終止符結尾 → 立刻成句；或距上次上屏超過 {{nameof(OptSentenceSeg.NoCommitGapMs)}} → 成句。
+
+*為何以空格連接各次上屏*（2026-11-16 用戶拍板）：逐詞上屏在拉丁字母語言裡
+直接相連會黏成一個詞——`hello` ＋ `world` 變 `helloworld`，翻譯器無從分詞，
+譯文自然不準。空格一分隔，詞邊界對 LLM 是顯式的。中文片段之間多出的空格
+對 LLM 無害（模型對此高度容忍），是可接受的代價。
 
 *為何要注入 {{nameof(TimeProvider)}}*：成句與否取決於時間，而測試不能真的等五秒。
 注入時鐘之後，「經過了五秒」是一個可造的事實，而不是一次 sleep。
@@ -48,10 +51,17 @@ public class SentenceBuffer : ISentenceBuffer{
 	[Doc("時鐘。測試注入假時鐘以造出「已經過了一段時間」。")]
 	readonly TimeProvider Time;
 
-	[Doc("累積中的文字。")]
-	readonly StringBuilder Buf = new();
+	[Doc($$"""
+	累積中的文字片段，每次上屏一項（已去首尾空白）。
 
-	[Doc("保護 {{nameof(Buf)}} 與 {{nameof(LastCommitAt)}}。")]
+	*為何是片段清單而不是字符串構造器*：成句時要在各次上屏之間
+	補空格（見接口說明），`str.Join` 正好以清單為輸入；若邊收邊拼接，
+	就得在每次 Append 時判斷「要不要先墊一個空格」，清單把這個決定推遲到
+	成句那一刻，一次做完。
+	""")]
+	readonly List<str> Chunks = new();
+
+	[Doc("保護 {{nameof(Chunks)}} 與 {{nameof(LastCommitAt)}}。")]
 	readonly Lock Gate = new();
 
 	[Doc("最後一次上屏的時刻；null 表示目前沒有累積內容。")]
@@ -77,9 +87,10 @@ public class SentenceBuffer : ISentenceBuffer{
 			return null;
 		}
 		lock(Gate){
-			Buf.Append(Text);
+			var Chunk = Text.Trim();
+			Chunks.Add(Chunk);
 			LastCommitAt = Time.GetUtcNow();
-			return IsTerminated(Text) ? TakeUnsafe() : null;
+			return IsTerminated(Chunk) ? TakeUnsafe() : null;
 		}
 	}
 
@@ -91,7 +102,7 @@ public class SentenceBuffer : ISentenceBuffer{
 	""")]
 	public str? TryFlushByIdle(){
 		lock(Gate){
-			if(Buf.Length == 0 || LastCommitAt is null){
+			if(Chunks.Count == 0 || LastCommitAt is null){
 				return null;
 			}
 			var Elapsed = Time.GetUtcNow() - LastCommitAt.Value;
@@ -105,7 +116,7 @@ public class SentenceBuffer : ISentenceBuffer{
 	[Doc("丟棄緩衝。")]
 	public void Clear(){
 		lock(Gate){
-			Buf.Clear();
+			Chunks.Clear();
 			LastCommitAt = null;
 		}
 	}
@@ -129,10 +140,14 @@ public class SentenceBuffer : ISentenceBuffer{
 		return false;
 	}
 
-	[Doc("取出並清空緩衝；空白內容視為沒有句子。")]
+	[Doc($$"""
+	取出並清空緩衝：片段以單個空格連接（理由見接口說明）；空結果視為沒有句子。
+	*為何成句時才連接*：分隔是「送給 LLM 的表示法」，不是累積本身的語義；
+	留在最後一步，將來要換分隔策略（例如只在外圍語言之間補空格）只動這裡。
+	""")]
 	str? TakeUnsafe(){
-		var Text = Buf.ToString().Trim();
-		Buf.Clear();
+		var Text = str.Join(' ', Chunks);
+		Chunks.Clear();
 		LastCommitAt = null;
 		return Text.Length == 0 ? null : Text;
 	}
